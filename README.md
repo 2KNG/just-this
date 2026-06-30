@@ -30,13 +30,14 @@ python run.py                                   # http://localhost:8000
 
 <!-- TOOLS:START -->
 
-총 **5개** 도구
+총 **6개** 도구
 
 ### 문서
 
 | 도구 | 설명 | 실행 | 대체 |
 |------|------|------|------|
 | [이미지 변환·자르기](./imgconv/) | HEIC(아이폰)·PNG·JPG·WEBP 등 이미지를 무손실 우선으로 형식변환하고, 마우스로 자르고, 리사이즈하고, 메타데이터(EXIF·GPS)까지 제거하는 웹앱. 여러 장은 한 번에 zip. | `uvicorn app:app` | 온라인 이미지 변환·자르기 사이트 (배치 제한·워터마크·광고) |
+| [PDF 합치기·편집·압축](./pdftools/) | 여러 PDF/이미지 합치기, 페이지 추출·삭제·회전, 압축, PDF↔이미지 변환. iLovePDF·Smallpdf 유료 기능을 로컬에서 무료로. | `uvicorn app:app` | iLovePDF, Smallpdf 등 온라인 PDF 결제·광고 사이트 |
 | [PDF·문서 자르기·회전·변환](./webcrop/) | PDF·스캔 이미지를 회전·자동 기울기 보정(deskew)하고, 마우스로 영역을 잘라 A4·Letter·명함 등 표준 용지 규격에 맞춘 뒤 PDF/PNG/JPG로 변환하는 웹앱. | `uvicorn app:app` | 온라인 PDF 편집/변환 결제 사이트 (iLovePDF, Smallpdf 등 유료 기능) |
 
 ### 미디어

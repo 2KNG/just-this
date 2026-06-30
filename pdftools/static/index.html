@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PDF 합치기·편집·압축 — just-this</title>
+  <style>
+    :root{--bg:#eaf0f7;--surface:#fff;--surface2:#f4f7fb;--border:#d6e0ec;--fg:#16263d;--dim:#5e7088;--primary:#0f63ad;--primary-d:#0a4d89;--accent:#37a3df;--ok:#1a9e5f;--warn:#c2410c;--shadow:0 1px 3px rgba(20,50,90,.08),0 6px 20px rgba(20,50,90,.06);--r:12px;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",Roboto,Arial,sans-serif}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.55}
+    button,select,input{font-family:inherit}
+    a{color:var(--primary);text-decoration:none}
+    .nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:1.2rem;padding:0 1.4rem;height:58px;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:0 1px 8px rgba(20,50,90,.05)}
+    .nav-brand{font-weight:800;font-size:1.3rem;color:var(--primary);text-decoration:none}
+    .nav-links{display:flex;gap:.25rem;flex-wrap:wrap}
+    .nav-links a{color:var(--fg);text-decoration:none;padding:.42rem .8rem;border-radius:9px;font-size:.96rem}
+    .nav-links a:hover{background:var(--surface2);color:var(--primary)}
+    .nav-links a.cur{background:var(--primary);color:#fff}
+    .pagehead{max-width:52rem;margin:0 auto;padding:1.2rem 1rem .2rem;display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap}
+    .pagehead h1{margin:0;font-size:1.4rem;color:var(--primary-d)}
+    .pagehead .sub{color:var(--dim);font-size:.88rem}
+    .wrap{max-width:52rem;margin:0 auto;padding:1rem 1rem 5rem}
+    .tabs{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1rem}
+    .tabs button{background:var(--surface);color:var(--fg);border:1px solid var(--border);border-radius:999px;padding:.5rem 1rem;cursor:pointer;font-size:.95rem;font-weight:600}
+    .tabs button.sel{background:var(--primary);color:#fff;border-color:var(--primary)}
+    .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);padding:1.2rem 1.3rem}
+    .panel h2{margin:.1rem 0 .3rem;font-size:1.1rem}
+    .panel p.d{margin:.1rem 0 1rem;color:var(--dim);font-size:.9rem}
+    .row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin:.6rem 0}
+    .row>label.k{min-width:5rem;color:var(--dim);font-size:.9rem}
+    .drop{border:2px dashed var(--border);border-radius:var(--r);padding:1.4rem 1rem;text-align:center;color:var(--dim);cursor:pointer;background:var(--surface2)}
+    .drop:hover,.drop.over{border-color:var(--primary);color:var(--fg)}
+    .drop input{display:none}
+    .files{margin:.6rem 0 0;font-size:.9rem;color:var(--fg)}
+    .files div{padding:.15rem 0;border-bottom:1px solid var(--border)}
+    select,input[type=text],input[type=number]{background:var(--surface);color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:.45rem .65rem;font-size:.95rem}
+    .seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex-wrap:wrap}
+    .seg button{background:var(--surface);color:var(--fg);border:0;border-left:1px solid var(--border);padding:.4rem .8rem;cursor:pointer;font-size:.9rem}
+    .seg button:first-child{border-left:0}
+    .seg button.sel{background:var(--primary);color:#fff}
+    .btn{background:var(--primary);color:#fff;border:0;border-radius:10px;padding:.7rem 1rem;font-size:1rem;font-weight:700;cursor:pointer;width:100%;margin-top:1rem}
+    .btn:hover{background:var(--primary-d)} .btn:disabled{opacity:.5}
+    .muted{color:var(--dim);font-size:.85rem}
+    .hide{display:none}
+    .status{margin-top:.8rem;font-size:.92rem;min-height:1.2em}
+    .status.err{color:var(--warn)} .status.ok{color:var(--ok)} .status.work{color:var(--primary)}
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="nav-brand" href="../">just-this</a>
+    <div class="nav-links" id="nav"></div>
+  </nav>
+  <div class="pagehead">
+    <h1>PDF 합치기·편집·압축</h1>
+    <span class="sub">합치기 · 페이지 추출/삭제/회전 · 압축 · PDF↔이미지</span>
+  </div>
+
+  <div class="wrap">
+    <div class="tabs" id="tabs">
+      <button data-m="merge" class="sel">합치기</button>
+      <button data-m="pages">페이지 편집</button>
+      <button data-m="compress">압축</button>
+      <button data-m="to_images">PDF→이미지</button>
+      <button data-m="from_images">이미지→PDF</button>
+    </div>
+
+    <div class="panel">
+      <h2 id="mTitle">PDF·이미지 합치기</h2>
+      <p class="d" id="mDesc">여러 PDF·이미지를 고른 순서대로 한 PDF로 합칩니다.</p>
+
+      <label class="drop" id="drop">
+        <input type="file" id="file">
+        <div id="dropLabel"><strong>파일을 끌어다 놓거나 클릭</strong></div>
+        <div class="muted" id="accept">PDF·이미지 · 여러 개 가능</div>
+      </label>
+      <div class="files" id="files"></div>
+
+      <div id="opt_pages" class="hide">
+        <div class="row"><label class="k">페이지</label>
+          <input type="text" id="select" placeholder="예: 1-3,5,8-  (비우면 전체)" style="flex:1;min-width:14rem">
+        </div>
+        <div class="row"><label class="k">회전</label>
+          <span class="seg" id="rot"><button data-r="0" class="sel">0°</button><button data-r="90">90°</button><button data-r="180">180°</button><button data-r="270">270°</button></span>
+        </div>
+        <p class="muted">선택한 페이지만 남겨 추출/삭제하고, 회전을 적용합니다.</p>
+      </div>
+      <div id="opt_compress" class="hide">
+        <div class="row"><label class="k">방식</label>
+          <span class="seg" id="lvl"><button data-l="light" class="sel">가볍게(무손실 정리)</button><button data-l="strong">강하게(이미지 재압축)</button></span>
+        </div>
+        <div class="row" id="rowDpi"><label class="k">해상도</label><select id="cdpi"><option value="150">150 DPI</option><option value="120" selected>120 DPI</option><option value="100">100 DPI</option><option value="72">72 DPI</option></select><span class="muted">강하게 압축일 때 (낮을수록 작음)</span></div>
+      </div>
+      <div id="opt_to_images" class="hide">
+        <div class="row"><label class="k">형식</label><span class="seg" id="tfmt"><button data-f="png" class="sel">PNG</button><button data-f="jpg">JPG</button></span></div>
+        <div class="row"><label class="k">해상도</label><select id="tdpi"><option value="300">300 DPI</option><option value="150" selected>150 DPI</option><option value="100">100 DPI</option></select></div>
+      </div>
+
+      <button class="btn" id="go">합치기</button>
+      <div class="status" id="status"></div>
+    </div>
+  </div>
+
+  <script>
+  const $=s=>document.querySelector(s);
+  fetch('/api/tools').then(r=>r.json()).then(d=>{const n=$('#nav');(d.tools||[]).forEach(t=>{if(!t._open)return;const a=document.createElement('a');a.href=t._open;a.textContent=t.short||t.name;if(t.slug==='pdftools')a.className='cur';n.appendChild(a);});}).catch(()=>{});
+
+  const MODES={
+    merge:{title:'PDF·이미지 합치기',desc:'여러 PDF·이미지를 고른 순서대로 한 PDF로 합칩니다.',multi:true,accept:'.pdf,image/*',ep:'merge',btn:'합치기'},
+    pages:{title:'페이지 추출·삭제·회전',desc:'PDF에서 원하는 페이지만 남기고 회전합니다.',multi:false,accept:'.pdf',ep:'pages',btn:'적용·다운로드',opt:'opt_pages'},
+    compress:{title:'PDF 압축',desc:'용량을 줄입니다. 스캔/이미지 PDF는 ‘강하게’가 효과적.',multi:false,accept:'.pdf',ep:'compress',btn:'압축·다운로드',opt:'opt_compress'},
+    to_images:{title:'PDF → 이미지',desc:'각 페이지를 PNG/JPG로. 여러 장은 zip.',multi:false,accept:'.pdf',ep:'to_images',btn:'변환·다운로드',opt:'opt_to_images'},
+    from_images:{title:'이미지 → PDF',desc:'이미지 여러 장을 고른 순서대로 한 PDF로.',multi:true,accept:'image/*',ep:'from_images',btn:'PDF 만들기'},
+  };
+  let mode='merge', picked=[], rot=0, lvl='light', tfmt='png';
+
+  $('#tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+    [...$('#tabs').children].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');setMode(b.dataset.m);});
+
+  function setMode(m){
+    mode=m; const c=MODES[m];
+    $('#mTitle').textContent=c.title; $('#mDesc').textContent=c.desc; $('#go').textContent=c.btn;
+    $('#file').multiple=!!c.multi; $('#file').accept=c.accept;
+    $('#accept').textContent=(c.multi?'여러 개 가능':'한 개')+' · '+(c.accept.includes('pdf')&&c.accept.includes('image')?'PDF·이미지':c.accept.includes('pdf')?'PDF':'이미지');
+    ['opt_pages','opt_compress','opt_to_images'].forEach(id=>$('#'+id).classList.add('hide'));
+    if(c.opt)$('#'+c.opt).classList.remove('hide');
+    picked=[]; renderFiles(); st('');
+  }
+
+  const drop=$('#drop'), fileInput=$('#file');
+  ['dragover','dragenter'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('over')}));
+  ['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('over')}));
+  drop.addEventListener('drop',e=>{addFiles([...e.dataTransfer.files])});
+  fileInput.addEventListener('change',()=>addFiles([...fileInput.files]));
+  function addFiles(fs){ if(!MODES[mode].multi){picked=fs.slice(0,1);} else {picked=picked.concat(fs);} renderFiles(); }
+  function renderFiles(){ $('#files').innerHTML=picked.map((f,i)=>`<div>${i+1}. ${f.name} <span class="muted">(${Math.round(f.size/1024)}KB)</span></div>`).join(''); }
+
+  $('#rot').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$('#rot').children].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');rot=+b.dataset.r;});
+  $('#lvl').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$('#lvl').children].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');lvl=b.dataset.l;$('#rowDpi').style.opacity=lvl==='strong'?'1':'.5';});
+  $('#tfmt').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$('#tfmt').children].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');tfmt=b.dataset.f;});
+
+  $('#go').addEventListener('click',async()=>{
+    const c=MODES[mode];
+    if(!picked.length){st('파일을 올려주세요','err');return;}
+    st('처리 중…','work'); $('#go').disabled=true;
+    const fd=new FormData();
+    if(c.multi){picked.forEach(f=>fd.append('files',f));}
+    else{fd.append('file',picked[0]);}
+    if(mode==='pages'){fd.append('select',$('#select').value);fd.append('rotate',rot);}
+    if(mode==='compress'){fd.append('level',lvl);fd.append('dpi',$('#cdpi').value);}
+    if(mode==='to_images'){fd.append('fmt',tfmt);fd.append('dpi',$('#tdpi').value);}
+    try{
+      const res=await fetch('api/'+c.ep,{method:'POST',body:fd});
+      if(!res.ok)throw new Error((await res.json().catch(()=>({}))).detail||('HTTP '+res.status));
+      const blob=await res.blob();
+      const cd=res.headers.get('Content-Disposition')||'';
+      const name=(cd.match(/filename="?([^"]+)"?/)||[])[1]||'output';
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
+      st('완료 — '+name+' ('+Math.round(blob.size/1024)+'KB)','ok');
+    }catch(err){st('실패: '+err.message,'err')}
+    $('#go').disabled=false;
+  });
+
+  function st(t,c){const s=$('#status');s.textContent=t;s.className='status'+(c?' '+c:'')}
+  setMode('merge');
+  </script>
+</body>
+</html>

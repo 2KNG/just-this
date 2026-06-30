@@ -9,3 +9,4 @@
 -r webcrop/requirements.txt
 -r vidconv/requirements.txt
 -r ytdl/requirements.txt
+-r pdftools/requirements.txt

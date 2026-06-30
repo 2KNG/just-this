@@ -1,0 +1,13 @@
+{
+  "name": "PDF 합치기·편집·압축",
+  "short": "PDF 도구",
+  "slug": "pdftools",
+  "category": "문서",
+  "description": "여러 PDF/이미지 합치기, 페이지 추출·삭제·회전, 압축, PDF↔이미지 변환. iLovePDF·Smallpdf 유료 기능을 로컬에서 무료로.",
+  "lang": "python",
+  "type": "web",
+  "run": "uvicorn app:app",
+  "entry": "/pdftools/",
+  "tags": ["pdf", "merge", "split", "compress", "rotate", "images"],
+  "replaces": "iLovePDF, Smallpdf 등 온라인 PDF 결제·광고 사이트"
+}
