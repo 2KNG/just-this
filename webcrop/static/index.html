@@ -17,45 +17,47 @@
     body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.55}
     button,select,input{font-family:inherit}
     a{color:var(--primary);text-decoration:none}
-    .nav{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:1.2rem;padding:0 1.4rem;height:60px;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:0 1px 8px rgba(20,50,90,.05)}
-    .nav-brand{font-weight:800;font-size:1.4rem;color:var(--primary);text-decoration:none}
+    .nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:1.2rem;padding:0 1.4rem;height:58px;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:0 1px 8px rgba(20,50,90,.05)}
+    .nav-brand{font-weight:800;font-size:1.3rem;color:var(--primary);text-decoration:none}
     .nav-links{display:flex;gap:.25rem;flex-wrap:wrap}
-    .nav-links a{color:var(--fg);text-decoration:none;padding:.42rem .8rem;border-radius:9px;font-size:1rem}
+    .nav-links a{color:var(--fg);text-decoration:none;padding:.42rem .8rem;border-radius:9px;font-size:.96rem}
     .nav-links a:hover{background:var(--surface2);color:var(--primary)}
     .nav-links a.cur{background:var(--primary);color:#fff}
     .pagehead{max-width:64rem;margin:0 auto;padding:1.2rem 1rem .2rem;display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap}
     .pagehead h1{margin:0;font-size:1.4rem;color:var(--primary-d)}
     .pagehead .sub{color:var(--dim);font-size:.88rem}
-    .wrap{max-width:64rem;margin:0 auto;padding:1rem 1rem 5rem}
+    .wrap{max-width:64rem;margin:0 auto;padding:1rem 1rem 6rem}
     .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);padding:1.1rem 1.2rem;margin-bottom:1.1rem}
     .panel h2{margin:.1rem 0 .9rem;font-size:1.02rem}
     .row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin:.55rem 0}
-    .row>label.k{min-width:6.5rem;color:var(--dim);font-size:.9rem}
+    .row>label.k{min-width:6rem;color:var(--dim);font-size:.9rem}
     .drop{border:2px dashed var(--border);border-radius:var(--r);padding:1.6rem 1rem;text-align:center;color:var(--dim);cursor:pointer;background:var(--surface2)}
     .drop:hover,.drop.over{border-color:var(--primary);color:var(--fg)}
     .drop input{display:none}
     .file-name{color:var(--fg);font-weight:600}
     select,input[type=number],input[type=text]{background:var(--surface);color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:.4rem .6rem;font-size:.9rem}
     input[type=range]{accent-color:var(--primary)}
+    input[type=number].rot{width:5.5rem;text-align:right}
     .seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
     .seg button{background:var(--surface);color:var(--fg);border:0;border-left:1px solid var(--border);padding:.4rem .75rem;cursor:pointer;font-size:.9rem}
     .seg button:first-child{border-left:0}
     .seg button.sel{background:var(--primary);color:#fff}
     .btn{background:var(--primary);color:#fff;border:0;border-radius:10px;padding:.6rem 1rem;font-size:.95rem;font-weight:700;cursor:pointer}
     .btn:hover{background:var(--primary-d)} .btn:disabled{opacity:.5;cursor:default}
-    .btn.ghost{background:var(--surface);color:var(--primary);border:1px solid var(--border)}
+    .btn.mini{background:var(--surface);color:var(--primary);border:1px solid var(--border);padding:.35rem .6rem;font-size:.85rem;border-radius:8px}
     .go{display:block;width:100%;padding:.9rem;font-size:1.05rem}
     .toggle{display:inline-flex;align-items:center;gap:.4rem;cursor:pointer;user-select:none}
     .muted{color:var(--dim);font-size:.85rem}
     .pages{display:flex;flex-direction:column;gap:1rem}
     .page{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
     .page .ptitle{padding:.5rem .8rem;border-bottom:1px solid var(--border);font-size:.85rem;color:var(--dim);background:var(--surface2)}
-    .page .imgbox{padding:.6rem;max-height:70vh}
+    .page .imgbox{padding:.6rem;max-height:74vh}
     .page img{display:block;max-width:100%}
     .status{margin-top:.8rem;font-size:.92rem;min-height:1.2em}
     .status.err{color:var(--warn)} .status.ok{color:var(--ok)}
     .hide{display:none}
-    .toolbar{position:sticky;bottom:0;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow);border-radius:var(--r);padding:1rem 1.1rem;margin-top:1.1rem}
+    .controls{position:sticky;top:58px;z-index:10;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow);border-radius:var(--r);padding:.9rem 1.1rem;margin-bottom:1.1rem}
+    .toolbar{position:sticky;bottom:0;z-index:10;background:var(--surface);border:1px solid var(--border);box-shadow:0 -2px 16px rgba(20,50,90,.1);border-radius:var(--r);padding:1rem 1.1rem;margin-top:1.1rem}
   </style>
 </head>
 <body>
@@ -65,56 +67,51 @@
   </nav>
   <div class="pagehead">
     <h1>PDF·문서 자르기·회전·변환</h1>
-    <span class="sub">기울기 보정 · 회전 · 자르기 · A4/Letter/명함 맞춤 · PDF/PNG/JPG</span>
+    <span class="sub">회전 · 자르기(테두리 스냅) · A4/Letter/명함 실치수 맞춤 · PDF/PNG/JPG</span>
   </div>
 
   <div class="wrap">
-    <!-- 1. 업로드 + 보정 -->
+    <!-- 1. 불러오기 -->
     <section class="panel">
-      <h2>1. 불러오기 · 보정</h2>
+      <h2>1. 불러오기</h2>
       <label class="drop" id="drop">
         <input type="file" id="file" accept=".pdf,.png,.jpg,.jpeg,.bmp,.tif,.tiff,.webp">
         <div id="dropLabel"><strong>PDF·이미지를 끌어다 놓거나 클릭</strong></div>
         <div class="muted">PDF · PNG · JPG · TIFF · 최대 50MB</div>
       </label>
       <div class="row">
-        <span class="toggle"><input type="checkbox" id="deskew" checked> <label for="deskew" style="cursor:pointer">자동 기울기 보정(deskew)</label></span>
-      </div>
-      <div class="row">
-        <label class="k">회전</label>
-        <span class="seg" id="orient">
-          <button data-o="0" class="sel">0°</button>
-          <button data-o="90">90°</button>
-          <button data-o="180">180°</button>
-          <button data-o="270">270°</button>
-        </span>
-      </div>
-      <div class="row">
-        <label class="k">미세 회전</label>
-        <input type="range" id="fine" min="-10" max="10" step="0.5" value="0" style="flex:1;max-width:24rem">
-        <span class="muted" id="fineVal">0.0°</span>
-      </div>
-      <div class="row">
-        <button class="btn" id="loadBtn" disabled>불러오기 · 보정 적용</button>
-        <span class="muted">보정 옵션을 바꾸면 이 버튼을 다시 눌러 재적용</span>
+        <span class="toggle"><input type="checkbox" id="deskew"> <label for="deskew" style="cursor:pointer">자동 기울기 보정(deskew)</label></span>
+        <button class="btn" id="loadBtn" disabled>불러오기</button>
       </div>
     </section>
 
-    <!-- 2. 페이지 (crop) -->
-    <section class="panel hide" id="step2">
-      <h2>2. 자르기 — 페이지 위에서 드래그</h2>
-      <p class="muted">용지를 고르면 자르기 박스 비율이 그 용지로 고정됩니다. 그대로 두면 전체 페이지가 변환돼요.</p>
+    <!-- 2. 편집: 회전(실시간) + 스냅 -->
+    <section class="controls hide" id="controls">
+      <div class="row">
+        <label class="k">회전</label>
+        <input type="range" id="rotRange" min="-180" max="180" step="0.5" value="0" style="flex:1;min-width:12rem;max-width:30rem">
+        <input type="number" id="rotNum" class="rot" min="-180" max="180" step="0.5" value="0"><span class="muted">°</span>
+        <button class="btn mini" data-rot="-90">↺ 90°</button>
+        <button class="btn mini" data-rot="90">↻ 90°</button>
+        <button class="btn mini" data-rot="0">0°</button>
+      </div>
+      <div class="row">
+        <span class="toggle"><input type="checkbox" id="snap"> <label for="snap" style="cursor:pointer">테두리 스냅 — 내용 경계에 딱 맞춤</label></span>
+        <span class="muted">끄면 자유롭게 드래그</span>
+      </div>
+    </section>
+
+    <section class="hide" id="pagesSec">
       <div class="pages" id="pages"></div>
     </section>
 
     <!-- 3. 변환 -->
-    <section class="toolbar hide" id="step3">
-      <h2 style="margin:.1rem 0 .8rem;font-size:1.02rem">3. 변환 · 다운로드</h2>
+    <section class="toolbar hide" id="toolbar">
       <div class="row">
         <label class="k">용지 규격</label>
         <select id="paper">
-          <option value="">없음 (자른 그대로)</option>
-          <option value="a4">A4</option><option value="a3">A3</option><option value="a5">A5</option>
+          <option value="">없음 (자른 그대로 · 원본 실치수)</option>
+          <option value="a4">A4 (210×297mm)</option><option value="a3">A3</option><option value="a5">A5</option>
           <option value="letter">Letter</option><option value="legal">Legal</option><option value="tabloid">Tabloid</option>
           <option value="card">명함 (90×50)</option><option value="card_us">명함 US (89×51)</option>
         </select>
@@ -133,12 +130,11 @@
         </span>
         <label class="k" style="min-width:auto">화질</label>
         <select id="quality2">
-          <option value="lossless">원본 (무손실) — 자른 픽셀 그대로</option>
-          <option value="95">고품질 (JPEG 95, 작게)</option>
-          <option value="80">표준 (JPEG 80, 더 작게)</option>
+          <option value="lossless">원본 (무손실)</option>
+          <option value="95">고품질 (JPEG 95)</option>
+          <option value="80">표준 (JPEG 80)</option>
         </select>
       </div>
-      <p class="muted" style="margin:.2rem 0 0">크롭은 항상 원본 픽셀을 그대로 잘라냅니다. ‘원본(무손실)’이면 PDF엔 PNG로 임베드돼 화질 손실 0.</p>
       <button class="btn go" id="convertBtn">변환 · 다운로드</button>
       <div class="status" id="status"></div>
     </section>
@@ -147,97 +143,105 @@
   <script src="static/cropper.min.js"></script>
   <script>
   const $=s=>document.querySelector(s);
-  // 상단 네비: 허브의 도구 목록을 받아 채움 (단독 실행이면 조용히 생략)
   fetch('/api/tools').then(r=>r.json()).then(d=>{const n=document.getElementById('nav');(d.tools||[]).forEach(t=>{if(!t._open)return;const a=document.createElement('a');a.href=t._open;a.textContent=t.short||t.name;if(t.slug==='webcrop')a.className='cur';n.appendChild(a);});}).catch(()=>{});
-  const PAPERS={a3:[297,420],a4:[210,297],a5:[148,210],letter:[215.9,279.4],legal:[215.9,355.6],tabloid:[279.4,431.8],card:[90,50],card_us:[88.9,50.8]};
-  let selectedFile=null, token=null, pages=[], orientVal=0;
 
-  // 파일 선택 / 드래그
+  let selectedFile=null, pages=[];   // pages: [{idx, cropper, snap:[x,y,w,h]}]
+
+  // 파일 선택
   const drop=$('#drop'), fileInput=$('#file'), loadBtn=$('#loadBtn');
   ['dragover','dragenter'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('over')}));
   ['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('over')}));
-  drop.addEventListener('drop',e=>{ if(e.dataTransfer.files[0]) pickFile(e.dataTransfer.files[0]); });
-  fileInput.addEventListener('change',()=>{ if(fileInput.files[0]) pickFile(fileInput.files[0]); });
-  function pickFile(f){ selectedFile=f; $('#dropLabel').innerHTML='<span class="file-name">'+f.name+'</span> — 다시 고르려면 클릭'; loadBtn.disabled=false; }
+  drop.addEventListener('drop',e=>{if(e.dataTransfer.files[0])pick(e.dataTransfer.files[0])});
+  fileInput.addEventListener('change',()=>{if(fileInput.files[0])pick(fileInput.files[0])});
+  function pick(f){selectedFile=f;$('#dropLabel').innerHTML='<span class="file-name">'+f.name+'</span> — 다시 고르려면 클릭';loadBtn.disabled=false;}
 
-  // 보정 옵션
-  $('#orient').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$('#orient').children].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');orientVal=+b.dataset.o;});
-  $('#fine').addEventListener('input',e=>$('#fineVal').textContent=(+e.target.value).toFixed(1)+'°');
-
-  // 출력 옵션 토글
-  let paperMode='crop', fmt='pdf';
-  $('#paperMode').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$('#paperMode').children].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');paperMode=b.dataset.m;});
-  $('#fmt').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$('#fmt').children].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');fmt=b.dataset.f;});
-  $('#paper').addEventListener('change',applyRatio);
-  $('#landscape').addEventListener('change',applyRatio);
-
-  function paperRatio(){
-    const p=$('#paper').value; if(!p||!PAPERS[p])return NaN;
-    let [w,h]=PAPERS[p]; if($('#landscape').checked)[w,h]=[h,w]; return w/h;
-  }
-  function applyRatio(){ const r=paperRatio(); pages.forEach(p=>p.cropper&&p.cropper.setAspectRatio(r)); }
-
-  // 업로드 · 보정
+  // 불러오기
   loadBtn.addEventListener('click',async()=>{
     if(!selectedFile)return;
-    setStatus('불러오는 중…'); loadBtn.disabled=true;
-    const fd=new FormData();
-    fd.append('file',selectedFile);
-    fd.append('auto_deskew',$('#deskew').checked);
-    fd.append('rotate',$('#fine').value);
-    fd.append('orient',orientVal);
+    status('불러오는 중…');loadBtn.disabled=true;
+    const fd=new FormData();fd.append('file',selectedFile);fd.append('auto_deskew',$('#deskew').checked);
     try{
       const res=await fetch('api/upload',{method:'POST',body:fd});
-      if(!res.ok) throw new Error(await res.text());
+      if(!res.ok)throw new Error(await res.text());
       const data=await res.json();
-      token=data.token; buildPages(data.pages);
-      $('#step2').classList.remove('hide'); $('#step3').classList.remove('hide');
-      setStatus('보정 완료 — '+data.pages.length+'페이지. 자르고 변환하세요.','ok');
-      $('#step2').scrollIntoView({behavior:'smooth'});
-    }catch(err){ setStatus('실패: '+err.message,'err'); }
+      build(data.pages);
+      $('#controls').classList.remove('hide');$('#pagesSec').classList.remove('hide');$('#toolbar').classList.remove('hide');
+      status('불러옴 — '+data.pages.length+'페이지. 회전/자르고 변환하세요.','ok');
+      // 현재 회전값 반영
+      applyRot(+$('#rotNum').value);
+    }catch(err){status('실패: '+err.message,'err')}
     loadBtn.disabled=false;
   });
 
-  function buildPages(list){
+  function build(list){
     pages.forEach(p=>p.cropper&&p.cropper.destroy());
-    pages=[]; const box=$('#pages'); box.innerHTML='';
-    const r=paperRatio();
+    pages=[];const box=$('#pages');box.innerHTML='';
     list.forEach(pg=>{
-      const card=document.createElement('div'); card.className='page';
+      const card=document.createElement('div');card.className='page';
       card.innerHTML='<div class="ptitle">페이지 '+(pg.idx+1)+' · '+pg.w+'×'+pg.h+'px</div><div class="imgbox"><img></div>';
-      const img=card.querySelector('img'); box.appendChild(card);
-      const rec={idx:pg.idx,cropper:null};
-      img.onload=()=>{ rec.cropper=new Cropper(img,{viewMode:1,autoCropArea:1,checkOrientation:false,background:false,aspectRatio:r}); };
+      const img=card.querySelector('img');box.appendChild(card);
+      const rec={idx:pg.idx,cropper:null,snap:pg.snap};
+      img.onload=()=>{rec.cropper=new Cropper(img,{viewMode:0,autoCropArea:1,checkOrientation:false,background:false,guides:true,rotatable:true,zoomable:false});};
       img.src=pg.url+'?t='+Date.now();
       pages.push(rec);
     });
   }
 
-  // 변환
+  // 회전 (실시간)
+  const rotRange=$('#rotRange'), rotNum=$('#rotNum');
+  function applyRot(v){pages.forEach(p=>p.cropper&&p.cropper.rotateTo(v));}
+  rotRange.addEventListener('input',e=>{rotNum.value=e.target.value;applyRot(+e.target.value);});
+  rotNum.addEventListener('input',e=>{let v=Math.max(-180,Math.min(180,+e.target.value||0));rotRange.value=v;applyRot(v);});
+  document.querySelectorAll('[data-rot]').forEach(b=>b.addEventListener('click',()=>{
+    let v=+b.dataset.rot;
+    if(b.dataset.rot==='90'||b.dataset.rot==='-90'){v=((+rotNum.value)+(+b.dataset.rot));} // 누적 ±90
+    v=Math.max(-180,Math.min(180,v));rotNum.value=v;rotRange.value=v;applyRot(v);
+  }));
+
+  // 테두리 스냅
+  $('#snap').addEventListener('change',e=>{
+    pages.forEach(p=>{
+      if(!p.cropper)return;
+      if(e.target.checked && p.snap){const[x,y,w,h]=p.snap;p.cropper.setData({x,y,width:w,height:h});}
+      else{const d=p.cropper.getImageData();p.cropper.setData({x:0,y:0,width:d.naturalWidth,height:d.naturalHeight});}
+    });
+  });
+
+  // 출력 옵션
+  let paperMode='crop',fmt='pdf';
+  $('#paperMode').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$('#paperMode').children].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');paperMode=b.dataset.m;});
+  $('#fmt').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$('#fmt').children].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');fmt=b.dataset.f;});
+
+  // 변환: 브라우저에서 회전+크롭 결과를 그대로 만들어 보냄 (WYSIWYG)
+  const toBlob=c=>new Promise(r=>c.toBlob(r,'image/png'));
   $('#convertBtn').addEventListener('click',async()=>{
-    if(!token){setStatus('먼저 불러오기 하세요','err');return;}
-    setStatus('변환 중…'); $('#convertBtn').disabled=true;
-    const crops=pages.filter(p=>p.cropper).map(p=>{const d=p.cropper.getData(true);return{idx:p.idx,x:d.x,y:d.y,w:d.width,h:d.height};});
-    const fd=new FormData();
-    fd.append('token',token); fd.append('fmt',fmt);
-    fd.append('paper',$('#paper').value); fd.append('paper_mode',paperMode);
-    fd.append('landscape',$('#landscape').checked);
-    const qv=$('#quality2').value, lossless=qv==='lossless';
-    fd.append('lossless',lossless); fd.append('quality',lossless?100:qv);
-    fd.append('crops',JSON.stringify(crops));
+    if(!pages.length){status('먼저 불러오기','err');return;}
+    status('변환 중…');$('#convertBtn').disabled=true;
     try{
-      const res=await fetch('api/convert',{method:'POST',body:fd});
-      if(!res.ok) throw new Error(await res.text());
+      const fd=new FormData();let n=0;
+      for(const p of pages){
+        if(!p.cropper)continue;
+        const c=p.cropper.getCroppedCanvas({fillColor:'#ffffff',imageSmoothingEnabled:true,imageSmoothingQuality:'high'});
+        if(!c)continue;
+        fd.append('files',await toBlob(c),`page_${++n}.png`);
+      }
+      if(!n)throw new Error('자른 영역이 없음');
+      fd.append('fmt',fmt);fd.append('paper',$('#paper').value);fd.append('paper_mode',paperMode);
+      fd.append('landscape',$('#landscape').checked);
+      const qv=$('#quality2').value,lossless=qv==='lossless';
+      fd.append('lossless',lossless);fd.append('quality',lossless?100:qv);
+      const res=await fetch('api/assemble',{method:'POST',body:fd});
+      if(!res.ok)throw new Error(await res.text());
       const blob=await res.blob();
       const cd=res.headers.get('Content-Disposition')||'';
       const name=(cd.match(/filename="?([^"]+)"?/)||[])[1]||('webcrop.'+fmt);
-      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
-      setStatus('완료 — '+name+' 다운로드','ok');
-    }catch(err){ setStatus('실패: '+err.message,'err'); }
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
+      status('완료 — '+name+' 다운로드','ok');
+    }catch(err){status('실패: '+err.message,'err')}
     $('#convertBtn').disabled=false;
   });
 
-  function setStatus(t,cls){ const s=$('#status'); s.textContent=t; s.className='status'+(cls?' '+cls:''); }
+  function status(t,cls){const s=$('#status');s.textContent=t;s.className='status'+(cls?' '+cls:'');}
   </script>
 </body>
 </html>
