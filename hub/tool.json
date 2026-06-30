@@ -1,0 +1,12 @@
+{
+  "name": "just-this 허브",
+  "slug": "hub",
+  "category": "기타",
+  "description": "레포의 모든 tool.json을 자동으로 읽어 카테고리·검색·태그로 보여주는 셀프호스팅 대시보드. 도구 창고의 현관.",
+  "lang": "python",
+  "type": "web",
+  "run": "pip install -r requirements.txt && uvicorn app:app",
+  "entry": "http://localhost:8000",
+  "tags": ["dashboard", "launcher", "hub", "self-hosted"],
+  "replaces": "도구마다 주소·실행법을 따로 북마크/메모로 관리하던 짓"
+}
