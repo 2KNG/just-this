@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QR 코드 생성·읽기 — just-this</title>
+  <style>
+    :root{--bg:#eaf0f7;--surface:#fff;--surface2:#f4f7fb;--border:#d6e0ec;--fg:#16263d;--dim:#5e7088;--primary:#0f63ad;--primary-d:#0a4d89;--ok:#1a9e5f;--warn:#c2410c;--shadow:0 1px 3px rgba(20,50,90,.08),0 6px 20px rgba(20,50,90,.06);--r:12px;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",Roboto,Arial,sans-serif}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.5}
+    button,select,input,textarea{font-family:inherit}
+    a{color:var(--primary);text-decoration:none}
+    .nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:1.2rem;padding:0 1.4rem;height:58px;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:0 1px 8px rgba(20,50,90,.05)}
+    .nav-brand{font-weight:800;font-size:1.3rem;color:var(--primary);text-decoration:none}
+    .nav-links{display:flex;gap:.25rem;flex-wrap:wrap}
+    .nav-links a{color:var(--fg);text-decoration:none;padding:.42rem .8rem;border-radius:9px;font-size:.96rem}
+    .nav-links a:hover{background:var(--surface2);color:var(--primary)}
+    .nav-links a.cur{background:var(--primary);color:#fff}
+    .pagehead{max-width:46rem;margin:0 auto;padding:1.2rem 1rem .2rem;display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap}
+    .pagehead h1{margin:0;font-size:1.4rem;color:var(--primary-d)}
+    .pagehead .sub{color:var(--dim);font-size:.88rem}
+    .wrap{max-width:46rem;margin:0 auto;padding:1rem 1rem 5rem}
+    .tabs{display:flex;gap:.4rem;margin-bottom:1rem}
+    .tabs button{background:var(--surface);color:var(--fg);border:1px solid var(--border);border-radius:999px;padding:.5rem 1.2rem;cursor:pointer;font-size:.95rem;font-weight:600}
+    .tabs button.sel{background:var(--primary);color:#fff;border-color:var(--primary)}
+    .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);padding:1.2rem 1.3rem}
+    .row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin:.6rem 0}
+    .row>label.k{min-width:5rem;color:var(--dim);font-size:.9rem}
+    textarea{width:100%;min-height:5rem;border:1px solid var(--border);border-radius:10px;padding:.6rem .7rem;font-size:.95rem;background:var(--surface2);color:var(--fg);resize:vertical}
+    select,input[type=number]{background:var(--surface);color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:.45rem .6rem;font-size:.92rem}
+    input[type=number]{width:5rem}
+    input[type=color]{width:42px;height:32px;border:1px solid var(--border);border-radius:8px;padding:0;background:none}
+    .btn{background:var(--primary);color:#fff;border:0;border-radius:10px;padding:.65rem 1rem;font-size:1rem;font-weight:700;cursor:pointer}
+    .btn:hover{background:var(--primary-d)} .btn.sec{background:var(--surface);color:var(--primary);border:1px solid var(--border)}
+    .drop{border:2px dashed var(--border);border-radius:var(--r);padding:1.4rem 1rem;text-align:center;color:var(--dim);cursor:pointer;background:var(--surface2)}
+    .drop:hover,.drop.over{border-color:var(--primary);color:var(--fg)}
+    .drop input{display:none}
+    .qrbox{text-align:center;margin-top:1rem}
+    .qrbox img{max-width:280px;width:100%;background:#fff;border:1px solid var(--border);border-radius:10px;padding:.5rem}
+    .out{white-space:pre-wrap;word-break:break-all;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.8rem .9rem;margin-top:.8rem;font-size:.95rem}
+    .muted{color:var(--dim);font-size:.84rem}
+    .status{margin-top:.7rem;font-size:.9rem;min-height:1.1em}
+    .status.err{color:var(--warn)} .status.ok{color:var(--ok)}
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="nav-brand" href="../">just-this</a>
+    <div class="nav-links" id="nav"></div>
+  </nav>
+  <div class="pagehead"><h1>QR 코드 생성·읽기</h1><span class="sub">추적·만료 없는 깔끔한 QR</span></div>
+
+  <div class="wrap">
+    <div class="tabs" id="tabs">
+      <button data-t="gen" class="sel">생성</button>
+      <button data-t="read">읽기</button>
+    </div>
+
+    <div class="panel" id="genP">
+      <textarea id="text" placeholder="QR로 만들 텍스트나 URL"></textarea>
+      <div class="row">
+        <label class="k">오류보정</label>
+        <select id="ecc"><option value="L">L (낮음)</option><option value="M" selected>M</option><option value="Q">Q</option><option value="H">H (높음·로고용)</option></select>
+        <label class="k" style="min-width:auto">크기</label><input type="number" id="box" min="2" max="40" value="10">
+        <label class="k" style="min-width:auto">여백</label><input type="number" id="border" min="0" max="16" value="4">
+      </div>
+      <div class="row">
+        <label class="k">색</label>전경 <input type="color" id="fg" value="#000000"> 배경 <input type="color" id="bg" value="#ffffff">
+      </div>
+      <div class="row"><button class="btn" id="gen">생성</button></div>
+      <div class="status" id="gs"></div>
+      <div class="qrbox" id="qrbox"></div>
+    </div>
+
+    <div class="panel" id="readP" style="display:none">
+      <label class="drop" id="drop"><input type="file" id="file" accept="image/*"><div id="dl"><strong>QR 이미지를 끌어다 놓거나 클릭</strong></div><div class="muted">PNG·JPG 등</div></label>
+      <div class="status" id="rs"></div>
+      <div class="out" id="ro" style="display:none"></div>
+    </div>
+  </div>
+
+  <script>
+  const $=s=>document.querySelector(s);
+  fetch('/api/tools').then(r=>r.json()).then(d=>{const n=$('#nav');(d.tools||[]).forEach(t=>{if(!t._open)return;const a=document.createElement('a');a.href=t._open;a.textContent=t.short||t.name;if(t.slug==='qr')a.className='cur';n.appendChild(a);});}).catch(()=>{});
+
+  $('#tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$('#tabs').children].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');
+    $('#genP').style.display=b.dataset.t==='gen'?'block':'none';$('#readP').style.display=b.dataset.t==='read'?'block':'none';});
+
+  $('#gen').addEventListener('click',async()=>{
+    const text=$('#text').value; if(!text.trim()){gs('내용을 넣어주세요','err');return;}
+    gs('생성 중…');
+    const fd=new FormData();fd.append('text',text);fd.append('ecc',$('#ecc').value);fd.append('box',$('#box').value);fd.append('border',$('#border').value);fd.append('fg',$('#fg').value);fd.append('bg',$('#bg').value);
+    try{
+      const res=await fetch('api/generate',{method:'POST',body:fd});
+      if(!res.ok)throw new Error((await res.json().catch(()=>({}))).detail||res.status);
+      const url=URL.createObjectURL(await res.blob());
+      $('#qrbox').innerHTML=`<img src="${url}"><div style="margin-top:.6rem"><a class="btn" href="${url}" download="qr.png">PNG 다운로드</a></div>`;
+      gs('생성 완료','ok');
+    }catch(err){gs('실패: '+err.message,'err')}
+  });
+
+  const drop=$('#drop'),fileInput=$('#file');
+  ['dragover','dragenter'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('over')}));
+  ['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('over')}));
+  drop.addEventListener('drop',e=>{if(e.dataTransfer.files[0])readFile(e.dataTransfer.files[0])});
+  fileInput.addEventListener('change',()=>{if(fileInput.files[0])readFile(fileInput.files[0])});
+  async function readFile(f){
+    rs('읽는 중…'); $('#ro').style.display='none';
+    const fd=new FormData();fd.append('file',f);
+    try{
+      const res=await fetch('api/read',{method:'POST',body:fd});
+      if(!res.ok)throw new Error((await res.json().catch(()=>({}))).detail||res.status);
+      const d=await res.json();
+      $('#ro').textContent=d.results.join('\n'); $('#ro').style.display='block'; rs('읽음 — '+d.results.length+'개','ok');
+    }catch(err){rs('실패: '+err.message,'err')}
+  }
+
+  function gs(t,c){const s=$('#gs');s.textContent=t;s.className='status'+(c?' '+c:'')}
+  function rs(t,c){const s=$('#rs');s.textContent=t;s.className='status'+(c?' '+c:'')}
+  </script>
+</body>
+</html>

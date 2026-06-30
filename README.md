@@ -30,7 +30,7 @@ python run.py                                   # http://localhost:8000
 
 <!-- TOOLS:START -->
 
-총 **7개** 도구
+총 **8개** 도구
 
 ### 문서
 
@@ -58,6 +58,7 @@ python run.py                                   # http://localhost:8000
 | 도구 | 설명 | 실행 | 대체 |
 |------|------|------|------|
 | [just-this 허브](./hub/) | 레포의 모든 tool.json을 자동으로 읽어 카테고리·검색·태그로 보여주는 셀프호스팅 대시보드. 도구 창고의 현관. | `pip install -r requirements.txt && uvicorn app:app` | 도구마다 주소·실행법을 따로 북마크/메모로 관리하던 짓 |
+| [QR 코드 생성·읽기](./qr/) | 텍스트·URL을 QR 코드 이미지로 만들고(색·오류보정·여백 선택), 거꾸로 QR 이미지에서 내용을 읽어내는 웹앱. 추적·만료 거는 온라인 생성기 대신. | `uvicorn app:app` | 추적·만료·광고 거는 온라인 QR 생성기 |
 
 <!-- TOOLS:END -->
 

@@ -1,0 +1,13 @@
+{
+  "name": "QR 코드 생성·읽기",
+  "short": "QR",
+  "slug": "qr",
+  "category": "기타",
+  "description": "텍스트·URL을 QR 코드 이미지로 만들고(색·오류보정·여백 선택), 거꾸로 QR 이미지에서 내용을 읽어내는 웹앱. 추적·만료 거는 온라인 생성기 대신.",
+  "lang": "python",
+  "type": "web",
+  "run": "uvicorn app:app",
+  "entry": "/qr/",
+  "tags": ["qr", "qrcode", "generate", "decode", "url"],
+  "replaces": "추적·만료·광고 거는 온라인 QR 생성기"
+}

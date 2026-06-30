@@ -11,3 +11,4 @@
 -r ytdl/requirements.txt
 -r pdftools/requirements.txt
 -r devkit/requirements.txt
+-r qr/requirements.txt
