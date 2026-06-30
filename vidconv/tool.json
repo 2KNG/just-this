@@ -1,0 +1,13 @@
+{
+  "name": "동영상 자르기·변환",
+  "short": "동영상",
+  "slug": "vidconv",
+  "category": "미디어",
+  "description": "동영상을 영역 자르기(crop)·구간 자르기(trim)·리사이즈하고 MP4/WEBM/GIF/MP3(오디오)/PNG(프레임)로 변환하는 웹앱. ffmpeg 기반(코덱 폭넓게 지원).",
+  "lang": "python",
+  "type": "web",
+  "run": "uvicorn app:app",
+  "entry": "/vidconv/",
+  "tags": ["video", "convert", "crop", "trim", "gif", "ffmpeg"],
+  "replaces": "온라인 영상 변환·자르기 사이트 (용량 제한·워터마크·광고)"
+}

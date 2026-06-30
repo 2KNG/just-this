@@ -7,3 +7,4 @@
 -r hub/requirements.txt
 -r imgconv/requirements.txt
 -r webcrop/requirements.txt
+-r vidconv/requirements.txt
