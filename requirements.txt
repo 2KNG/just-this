@@ -8,3 +8,4 @@
 -r imgconv/requirements.txt
 -r webcrop/requirements.txt
 -r vidconv/requirements.txt
+-r ytdl/requirements.txt

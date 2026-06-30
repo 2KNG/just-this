@@ -1,0 +1,13 @@
+{
+  "name": "유튜브 추출",
+  "short": "유튜브",
+  "slug": "ytdl",
+  "category": "미디어",
+  "description": "유튜브(및 yt-dlp 지원 사이트) 영상/오디오를 화질 선택·구간 자르기·자막과 함께 추출하는 웹앱. 오디오만 mp3로도 추출. ffmpeg 기반.",
+  "lang": "python",
+  "type": "web",
+  "run": "uvicorn app:app",
+  "entry": "/ytdl/",
+  "tags": ["youtube", "download", "video", "audio", "mp3", "yt-dlp"],
+  "replaces": "광고·악성 팝업 범벅 다운로더 사이트, 유료 유튜브 다운로드 서비스"
+}

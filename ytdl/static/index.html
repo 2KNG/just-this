@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>유튜브 추출 — just-this</title>
+  <style>
+    :root{--bg:#eaf0f7;--surface:#fff;--surface2:#f4f7fb;--border:#d6e0ec;--fg:#16263d;--dim:#5e7088;--primary:#0f63ad;--primary-d:#0a4d89;--accent:#37a3df;--ok:#1a9e5f;--warn:#c2410c;--shadow:0 1px 3px rgba(20,50,90,.08),0 6px 20px rgba(20,50,90,.06);--r:12px;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",Roboto,Arial,sans-serif}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.55}
+    button,select,input{font-family:inherit}
+    a{color:var(--primary);text-decoration:none}
+    .nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:1.2rem;padding:0 1.4rem;height:58px;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:0 1px 8px rgba(20,50,90,.05)}
+    .nav-brand{font-weight:800;font-size:1.3rem;color:var(--primary);text-decoration:none}
+    .nav-links{display:flex;gap:.25rem;flex-wrap:wrap}
+    .nav-links a{color:var(--fg);text-decoration:none;padding:.42rem .8rem;border-radius:9px;font-size:.96rem}
+    .nav-links a:hover{background:var(--surface2);color:var(--primary)}
+    .nav-links a.cur{background:var(--primary);color:#fff}
+    .pagehead{max-width:54rem;margin:0 auto;padding:1.2rem 1rem .2rem;display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap}
+    .pagehead h1{margin:0;font-size:1.4rem;color:var(--primary-d)}
+    .pagehead .sub{color:var(--dim);font-size:.88rem}
+    .wrap{max-width:54rem;margin:0 auto;padding:1rem 1rem 5rem}
+    .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);padding:1.1rem 1.2rem;margin-bottom:1.1rem}
+    .panel h2{margin:.1rem 0 .9rem;font-size:1.02rem}
+    .row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin:.55rem 0}
+    .row>label.k{min-width:5rem;color:var(--dim);font-size:.9rem}
+    input[type=text],input[type=url],input[type=number],select{background:var(--surface);color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem;font-size:.95rem}
+    input[type=number]{width:6rem}
+    #url{flex:1;min-width:16rem}
+    .seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+    .seg button{background:var(--surface);color:var(--fg);border:0;border-left:1px solid var(--border);padding:.45rem .9rem;cursor:pointer;font-size:.92rem}
+    .seg button:first-child{border-left:0}
+    .seg button.sel{background:var(--primary);color:#fff}
+    .btn{background:var(--primary);color:#fff;border:0;border-radius:10px;padding:.55rem 1rem;font-size:.95rem;font-weight:700;cursor:pointer}
+    .btn:hover{background:var(--primary-d)} .btn:disabled{opacity:.5;cursor:default}
+    .go{display:block;width:100%;padding:.9rem;font-size:1.05rem}
+    .toggle{display:inline-flex;align-items:center;gap:.4rem;cursor:pointer;user-select:none}
+    .muted{color:var(--dim);font-size:.85rem}
+    .hide{display:none}
+    .vinfo{display:flex;gap:1rem;align-items:flex-start}
+    .vinfo img{width:160px;border-radius:8px;border:1px solid var(--border)}
+    .vinfo .t{font-weight:700;font-size:1.05rem}
+    .status{margin-top:.8rem;font-size:.92rem;min-height:1.2em}
+    .status.err{color:var(--warn)} .status.ok{color:var(--ok)} .status.work{color:var(--primary)}
+    .note{font-size:.82rem;color:var(--dim);background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem;margin-top:.4rem}
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="nav-brand" href="../">just-this</a>
+    <div class="nav-links" id="nav"></div>
+  </nav>
+  <div class="pagehead">
+    <h1>유튜브 추출</h1>
+    <span class="sub">화질 선택 · 오디오(mp3) · 구간 자르기 · 자막</span>
+  </div>
+
+  <div class="wrap">
+    <section class="panel">
+      <h2>1. 링크</h2>
+      <div class="row">
+        <input type="url" id="url" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off">
+        <button class="btn" id="infoBtn">정보 가져오기</button>
+      </div>
+      <div class="note">서버(이 PC)가 직접 받아서 내려줍니다. 인터넷 연결 필요. 개인 보관용으로 사용하세요.</div>
+      <div class="status" id="status0"></div>
+    </section>
+
+    <section class="panel hide" id="opt">
+      <div class="vinfo">
+        <img id="thumb" alt="" class="hide">
+        <div>
+          <div class="t" id="title">—</div>
+          <div class="muted" id="byline"></div>
+        </div>
+      </div>
+      <hr style="border:0;border-top:1px solid var(--border);margin:1rem 0">
+      <div class="row">
+        <label class="k">받기</label>
+        <span class="seg" id="mode">
+          <button data-m="video" class="sel">영상 (MP4)</button>
+          <button data-m="audio">오디오 (MP3)</button>
+        </span>
+      </div>
+      <div class="row" id="rowQ">
+        <label class="k">화질</label>
+        <select id="height"><option value="0">최고 화질</option></select>
+      </div>
+      <div class="row">
+        <span class="toggle"><input type="checkbox" id="useTrim"> <label for="useTrim" style="cursor:pointer">구간 자르기</label></span>
+        <span id="trimBox" class="hide">
+          <input type="number" id="start" min="0" step="1" value="0" placeholder="시작(초)"> ~
+          <input type="number" id="end" min="0" step="1" value="0" placeholder="끝(초)"> <span class="muted">초</span>
+        </span>
+      </div>
+      <div class="row" id="rowSubs">
+        <span class="toggle"><input type="checkbox" id="subs"> <label for="subs" style="cursor:pointer">자막 포함(있으면)</label></span>
+      </div>
+      <button class="btn go" id="dlBtn">다운로드</button>
+      <div class="status" id="status"></div>
+    </section>
+  </div>
+
+  <script>
+  const $=s=>document.querySelector(s);
+  fetch('/api/tools').then(r=>r.json()).then(d=>{const n=$('#nav');(d.tools||[]).forEach(t=>{if(!t._open)return;const a=document.createElement('a');a.href=t._open;a.textContent=t.short||t.name;if(t.slug==='ytdl')a.className='cur';n.appendChild(a);});}).catch(()=>{});
+
+  let mode='video';
+  function fmtDur(s){s=Math.round(s||0);const h=(s/3600|0),m=(s%3600/60|0),x=s%60;return (h?h+':':'')+String(m).padStart(h?2:1,'0')+':'+String(x).padStart(2,'0');}
+
+  function renderInfo(d){
+    $('#title').textContent=d.title||'(제목 없음)';
+    $('#byline').textContent=[d.uploader,d.duration?fmtDur(d.duration):''].filter(Boolean).join(' · ');
+    if(d.thumbnail){$('#thumb').src=d.thumbnail;$('#thumb').classList.remove('hide');}
+    const sel=$('#height');sel.innerHTML='<option value="0">최고 화질</option>';
+    (d.heights||[]).forEach(h=>{const o=document.createElement('option');o.value=h;o.textContent=h+'p';sel.appendChild(o);});
+    $('#opt').classList.remove('hide');
+    if(d.duration){$('#end').value=Math.round(d.duration);}
+  }
+
+  $('#infoBtn').addEventListener('click',async()=>{
+    const url=$('#url').value.trim(); if(!url){st0('URL을 넣어주세요','err');return;}
+    st0('가져오는 중…','work'); $('#infoBtn').disabled=true;
+    try{
+      const fd=new FormData();fd.append('url',url);
+      const res=await fetch('api/info',{method:'POST',body:fd});
+      if(!res.ok)throw new Error((await res.json()).detail||res.status);
+      renderInfo(await res.json()); st0('정보 불러옴','ok');
+    }catch(err){st0('실패: '+err.message,'err')}
+    $('#infoBtn').disabled=false;
+  });
+
+  $('#mode').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$('#mode').children].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');mode=b.dataset.m;
+    $('#rowQ').classList.toggle('hide',mode!=='video');$('#rowSubs').classList.toggle('hide',mode!=='video');});
+  $('#useTrim').addEventListener('change',e=>$('#trimBox').classList.toggle('hide',!e.target.checked));
+
+  $('#dlBtn').addEventListener('click',async()=>{
+    const url=$('#url').value.trim(); if(!url){st('URL 없음','err');return;}
+    st('받는 중… 영상 길이에 따라 오래 걸릴 수 있어요','work'); $('#dlBtn').disabled=true;
+    const fd=new FormData();
+    fd.append('url',url);fd.append('mode',mode);fd.append('height',$('#height').value||0);
+    fd.append('subs',$('#subs').checked);
+    if($('#useTrim').checked){fd.append('start',$('#start').value||0);fd.append('end',$('#end').value||0);}
+    try{
+      const res=await fetch('api/download',{method:'POST',body:fd});
+      if(!res.ok)throw new Error((await res.json()).detail||res.status);
+      const blob=await res.blob();
+      const cd=res.headers.get('Content-Disposition')||'';
+      let name=(cd.match(/filename\*=UTF-8''([^;]+)/)||[])[1];
+      name=name?decodeURIComponent(name):((cd.match(/filename="?([^"]+)"?/)||[])[1]||'download');
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
+      st('완료 — '+name+' ('+Math.round(blob.size/1048576)+'MB)','ok');
+    }catch(err){st('실패: '+err.message,'err')}
+    $('#dlBtn').disabled=false;
+  });
+
+  function st0(t,c){const s=$('#status0');s.textContent=t;s.className='status'+(c?' '+c:'')}
+  function st(t,c){const s=$('#status');s.textContent=t;s.className='status'+(c?' '+c:'')}
+  </script>
+</body>
+</html>
