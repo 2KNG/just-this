@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>개발 도구 모음 — just-this</title>
+  <style>
+    :root{--bg:#eaf0f7;--surface:#fff;--surface2:#f4f7fb;--border:#d6e0ec;--fg:#16263d;--dim:#5e7088;--primary:#0f63ad;--primary-d:#0a4d89;--ok:#1a9e5f;--warn:#c2410c;--shadow:0 1px 3px rgba(20,50,90,.08),0 6px 20px rgba(20,50,90,.06);--r:12px;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"D2Coding",monospace;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",Roboto,Arial,sans-serif}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.5}
+    button,select,input,textarea{font-family:inherit}
+    a{color:var(--primary);text-decoration:none}
+    .nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:1.2rem;padding:0 1.4rem;height:58px;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:0 1px 8px rgba(20,50,90,.05)}
+    .nav-brand{font-weight:800;font-size:1.3rem;color:var(--primary);text-decoration:none}
+    .nav-links{display:flex;gap:.25rem;flex-wrap:wrap}
+    .nav-links a{color:var(--fg);text-decoration:none;padding:.42rem .8rem;border-radius:9px;font-size:.96rem}
+    .nav-links a:hover{background:var(--surface2);color:var(--primary)}
+    .nav-links a.cur{background:var(--primary);color:#fff}
+    .pagehead{max-width:60rem;margin:0 auto;padding:1.2rem 1rem .2rem;display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap}
+    .pagehead h1{margin:0;font-size:1.4rem;color:var(--primary-d)}
+    .pagehead .sub{color:var(--dim);font-size:.88rem}
+    .wrap{max-width:60rem;margin:0 auto;padding:1rem 1rem 5rem}
+    .tabs{display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1rem}
+    .tabs button{background:var(--surface);color:var(--fg);border:1px solid var(--border);border-radius:999px;padding:.45rem 1rem;cursor:pointer;font-size:.92rem;font-weight:600}
+    .tabs button.sel{background:var(--primary);color:#fff;border-color:var(--primary)}
+    .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);padding:1.1rem 1.2rem}
+    .ctl{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-bottom:.7rem}
+    textarea{width:100%;min-height:9rem;border:1px solid var(--border);border-radius:10px;padding:.7rem .8rem;font-family:var(--mono);font-size:.9rem;background:var(--surface2);color:var(--fg);resize:vertical}
+    .out{white-space:pre-wrap;word-break:break-all;background:#0b1b2c;color:#d7e6f5;border-radius:10px;padding:.8rem .9rem;font-family:var(--mono);font-size:.88rem;min-height:3rem;margin-top:.6rem;overflow:auto;max-height:50vh}
+    .out.err{background:#3a1414;color:#ffd7cf}
+    .btn{background:var(--primary);color:#fff;border:0;border-radius:9px;padding:.5rem .9rem;font-size:.92rem;font-weight:700;cursor:pointer}
+    .btn:hover{background:var(--primary-d)}
+    .btn.sec{background:var(--surface);color:var(--primary);border:1px solid var(--border)}
+    select,input[type=text],input[type=number]{background:var(--surface);color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:.45rem .6rem;font-size:.92rem}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+    label.k{color:var(--dim);font-size:.88rem}
+    .muted{color:var(--dim);font-size:.84rem}
+    .copy{margin-left:auto}
+    @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <nav class="nav">
+    <a class="nav-brand" href="../">just-this</a>
+    <div class="nav-links" id="nav"></div>
+  </nav>
+  <div class="pagehead">
+    <h1>개발 도구 모음</h1>
+    <span class="sub">전부 브라우저에서 처리 — 데이터가 서버로 안 나갑니다</span>
+  </div>
+
+  <div class="wrap">
+    <div class="tabs" id="tabs">
+      <button data-t="json" class="sel">JSON</button>
+      <button data-t="base64">Base64</button>
+      <button data-t="url">URL</button>
+      <button data-t="jwt">JWT</button>
+      <button data-t="hash">해시</button>
+      <button data-t="ts">타임스탬프</button>
+      <button data-t="uuid">UUID</button>
+    </div>
+    <div class="panel" id="panel"></div>
+  </div>
+
+  <script>
+  const $=s=>document.querySelector(s);
+  fetch('/api/tools').then(r=>r.json()).then(d=>{const n=$('#nav');(d.tools||[]).forEach(t=>{if(!t._open)return;const a=document.createElement('a');a.href=t._open;a.textContent=t.short||t.name;if(t.slug==='devkit')a.className='cur';n.appendChild(a);});}).catch(()=>{});
+
+  // 공용 헬퍼
+  const enc=new TextEncoder(), dec=new TextDecoder();
+  function b64encode(str){const b=enc.encode(str);let s='';for(const x of b)s+=String.fromCharCode(x);return btoa(s);}
+  function b64decode(b){const s=atob(b.replace(/-/g,'+').replace(/_/g,'/'));const a=new Uint8Array(s.length);for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i);return dec.decode(a);}
+  function copyBtn(getText){const b=document.createElement('button');b.className='btn sec copy';b.textContent='복사';b.onclick=async()=>{try{await navigator.clipboard.writeText(getText());b.textContent='복사됨 ✓';setTimeout(()=>b.textContent='복사',1000);}catch(_){}};return b;}
+  function out(el,text,err){el.textContent=text;el.className='out'+(err?' err':'');}
+
+  const TABS={
+    json:()=>{
+      P.innerHTML=`<div class="ctl"><button class="btn" id="fmt">정리(들여쓰기)</button><button class="btn sec" id="min">압축</button><span class="muted">JSON 검증·포맷</span></div>
+        <textarea id="in" placeholder='{"hello":"world","n":[1,2,3]}'></textarea><div class="out" id="o"></div>`;
+      const run=(min)=>{try{const v=JSON.parse($('#in').value);out($('#o'),JSON.stringify(v,null,min?0:2));}catch(e){out($('#o'),'JSON 오류: '+e.message,1);}};
+      $('#fmt').onclick=()=>run(false);$('#min').onclick=()=>run(true);
+      $('#o').after(copyBtn(()=>$('#o').textContent));
+    },
+    base64:()=>{
+      P.innerHTML=`<div class="ctl"><button class="btn" id="e">인코드 →</button><button class="btn sec" id="d">← 디코드</button><span class="muted">UTF-8</span></div>
+        <textarea id="in" placeholder="텍스트 또는 base64"></textarea><div class="out" id="o"></div>`;
+      $('#e').onclick=()=>{try{out($('#o'),b64encode($('#in').value));}catch(e){out($('#o'),e.message,1);}};
+      $('#d').onclick=()=>{try{out($('#o'),b64decode($('#in').value.trim()));}catch(e){out($('#o'),'디코드 실패: '+e.message,1);}};
+      $('#o').after(copyBtn(()=>$('#o').textContent));
+    },
+    url:()=>{
+      P.innerHTML=`<div class="ctl"><button class="btn" id="e">인코드 →</button><button class="btn sec" id="d">← 디코드</button></div>
+        <textarea id="in" placeholder="https://example.com/검색?q=한글 띄어쓰기"></textarea><div class="out" id="o"></div>`;
+      $('#e').onclick=()=>out($('#o'),encodeURIComponent($('#in').value));
+      $('#d').onclick=()=>{try{out($('#o'),decodeURIComponent($('#in').value));}catch(e){out($('#o'),e.message,1);}};
+      $('#o').after(copyBtn(()=>$('#o').textContent));
+    },
+    jwt:()=>{
+      P.innerHTML=`<div class="ctl"><button class="btn" id="dec">디코드</button><span class="muted">서명 검증 X · 로컬 디코드만 (토큰을 남의 사이트에 붙여넣지 마세요)</span></div>
+        <textarea id="in" placeholder="eyJhbGciOi...header.payload.signature"></textarea>
+        <div class="grid2"><div><label class="k">HEADER</label><div class="out" id="h"></div></div><div><label class="k">PAYLOAD</label><div class="out" id="p"></div></div></div>`;
+      $('#dec').onclick=()=>{
+        const t=$('#in').value.trim().split('.');
+        if(t.length<2){out($('#h'),'JWT 형식 아님',1);out($('#p'),'',0);return;}
+        try{out($('#h'),JSON.stringify(JSON.parse(b64decode(t[0])),null,2));}catch(e){out($('#h'),'header 오류: '+e.message,1);}
+        try{const pl=JSON.parse(b64decode(t[1]));let extra='';if(pl.exp)extra='\\n\\n// exp = '+new Date(pl.exp*1000).toLocaleString();if(pl.iat)extra+='\\n// iat = '+new Date(pl.iat*1000).toLocaleString();out($('#p'),JSON.stringify(pl,null,2)+extra);}catch(e){out($('#p'),'payload 오류: '+e.message,1);}
+      };
+    },
+    hash:()=>{
+      P.innerHTML=`<div class="ctl"><select id="alg"><option>SHA-256</option><option>SHA-1</option><option>SHA-384</option><option>SHA-512</option></select><button class="btn" id="go">해시</button></div>
+        <textarea id="in" placeholder="해시할 텍스트"></textarea><div class="out" id="o"></div>`;
+      $('#go').onclick=async()=>{try{const buf=await crypto.subtle.digest($('#alg').value,enc.encode($('#in').value));const hex=[...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');out($('#o'),hex);}catch(e){out($('#o'),e.message,1);}};
+      $('#o').after(copyBtn(()=>$('#o').textContent));
+    },
+    ts:()=>{
+      P.innerHTML=`<div class="ctl"><button class="btn" id="now">지금</button><span class="muted">epoch(초/밀리초) ↔ 날짜</span></div>
+        <div class="ctl"><label class="k">epoch</label><input type="text" id="ep" placeholder="1700000000" style="width:14rem"><button class="btn sec" id="fromEp">→ 날짜</button></div>
+        <div class="ctl"><label class="k">날짜(ISO/로컬)</label><input type="text" id="dt" placeholder="2026-06-30 21:00" style="width:14rem"><button class="btn sec" id="fromDt">→ epoch</button></div>
+        <div class="out" id="o"></div>`;
+      const show=(d)=>out($('#o'),'로컬: '+d.toString()+'\\nUTC : '+d.toUTCString()+'\\nISO : '+d.toISOString()+'\\nepoch(s) : '+Math.floor(d.getTime()/1000)+'\\nepoch(ms): '+d.getTime());
+      $('#now').onclick=()=>{const d=new Date();$('#ep').value=Math.floor(d.getTime()/1000);show(d);};
+      $('#fromEp').onclick=()=>{let v=parseFloat($('#ep').value);if(!isFinite(v)){out($('#o'),'숫자를 넣어주세요',1);return;}if(v<1e12)v*=1000;show(new Date(v));};
+      $('#fromDt').onclick=()=>{const d=new Date($('#dt').value);if(isNaN(d)){out($('#o'),'날짜 형식 오류',1);return;}show(d);};
+    },
+    uuid:()=>{
+      P.innerHTML=`<div class="ctl"><button class="btn" id="gen">UUID v4 생성</button><select id="cnt"><option>1</option><option>5</option><option>10</option></select></div><div class="out" id="o"></div>`;
+      $('#gen').onclick=()=>{const n=+$('#cnt').value;out($('#o'),Array.from({length:n},()=>crypto.randomUUID()).join('\\n'));};
+      $('#gen').click();
+      $('#o').after(copyBtn(()=>$('#o').textContent));
+    },
+  };
+  const P=$('#panel');
+  $('#tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$('#tabs').children].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');TABS[b.dataset.t]();});
+  TABS.json();
+  </script>
+</body>
+</html>

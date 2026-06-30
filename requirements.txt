@@ -10,3 +10,4 @@
 -r vidconv/requirements.txt
 -r ytdl/requirements.txt
 -r pdftools/requirements.txt
+-r devkit/requirements.txt
