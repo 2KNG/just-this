@@ -13,7 +13,8 @@
 ```bash
 git clone https://github.com/2KNG/just-this.git
 cd just-this
-python -m venv .venv && . .venv/bin/activate   # 권장
+python -m venv venv                            # 가상환경 이름은 항상 venv (점 없이)
+. venv/bin/activate                            # Windows: venv\Scripts\Activate.ps1
 pip install -r requirements.txt                # 모든 도구 의존성 한 방에
 python run.py                                   # http://localhost:8000
 ```
