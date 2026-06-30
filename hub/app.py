@@ -33,6 +33,7 @@ app.mount("/static", StaticFiles(directory=os.path.join(HERE, "static")), name="
 templates = Jinja2Templates(directory=os.path.join(HERE, "templates"))
 
 MOUNTED = {}  # slug -> True : 서브앱으로 마운트 성공한 도구
+MOUNT_ERRORS = {}  # slug -> str : 마운트 실패 원인 (보통 의존성 미설치)
 
 
 def mount_tools():
@@ -54,7 +55,8 @@ def mount_tools():
             MOUNTED[slug] = True
             print(f"[hub] mounted /{slug}", file=sys.stderr)
         except Exception as e:  # 의존성 미설치 등 — 허브는 계속 뜬다
-            print(f"[hub] /{slug} 마운트 실패: {e}", file=sys.stderr)
+            MOUNT_ERRORS[slug] = f"{type(e).__name__}: {e}"
+            print(f"[hub] /{slug} 마운트 실패 (pip install 확인): {e}", file=sys.stderr)
 
 
 mount_tools()
@@ -74,6 +76,8 @@ def discover():
         t["_mounted"] = slug in MOUNTED
         is_py_web = t.get("lang") == "python" and t.get("type") == "web"
         has_app = bool(slug) and os.path.isfile(os.path.join(ROOT, slug, "app.py"))
+        # 코드는 있는데 마운트 안 됨 = 의존성 미설치 (pip install 다시 필요)
+        t["_needs_deps"] = is_py_web and has_app and not t["_mounted"]
         if t["_mounted"]:
             t["_open"] = f"/{slug}/"
             t["_open_blank"] = False
@@ -117,4 +121,4 @@ def api_tools():
 
 @app.get("/healthz")
 def healthz():
-    return {"ok": True, "mounted": sorted(MOUNTED)}
+    return {"ok": True, "mounted": sorted(MOUNTED), "mount_errors": MOUNT_ERRORS}

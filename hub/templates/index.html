@@ -4,7 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>just-this — 도구 창고</title>
-  <link rel="stylesheet" href="/static/fonts.css">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -21,50 +20,43 @@
   </nav>
 
   <div class="hero">
-    <p class="manifesto">검색하고, 광고 보고, 결제하느라 시간 버리는 짓 그만. 필요한 도구만 직접 만들어 쓰는 개인 창고.</p>
+    <p class="tagline">I JUST NEED THIS</p>
   </div>
 
   <div class="searchbar">
     <input id="q" type="search" placeholder="도구 검색 — 이름 / 설명 / 태그…" autocomplete="off">
   </div>
 
+  {% macro card_body(t) %}
+    <div class="card-head">
+      <h3 class="card-title">{{ t.name }}</h3>
+      {% if t.type %}<span class="badge type">{{ t.type }}</span>{% endif %}
+    </div>
+    <p class="desc">{{ t.description }}</p>
+    {% if t.tags %}<div class="tags">{% for tag in t.tags %}<span class="tag">{{ tag }}</span>{% endfor %}</div>{% endif %}
+    {% if t.replaces %}<p class="replaces"><span class="repl-label">대체</span> {{ t.replaces }}</p>{% endif %}
+  {% endmacro %}
+
   <main id="catalog">
-    {% if total == 0 %}
-      <p class="empty">아직 쓸 수 있는 도구가 없음.</p>
-    {% endif %}
+    {% if total == 0 %}<p class="empty">아직 쓸 수 있는 도구가 없음.</p>{% endif %}
 
     {% for cat, items in groups %}
     <section class="category" data-cat="{{ cat }}">
       <h2>{{ cat }} <span class="cat-count">{{ items|length }}</span></h2>
       <div class="grid">
         {% for t in items %}
-        <article class="card"
-                 data-search="{{ (t.name ~ ' ' ~ t.description ~ ' ' ~ (t.tags|join(' ') if t.tags else '') ~ ' ' ~ t.slug)|lower }}">
-          <div class="card-head">
-            <h3 class="card-title">{{ t.name }}</h3>
-            {% if t.type %}<span class="badge type">{{ t.type }}</span>{% endif %}
-          </div>
-
-          <p class="desc">{{ t.description }}</p>
-
-          {% if t.tags %}
-          <div class="tags">
-            {% for tag in t.tags %}<span class="tag">{{ tag }}</span>{% endfor %}
+          {% set ds = (t.name ~ ' ' ~ t.description ~ ' ' ~ (t.tags|join(' ') if t.tags else '') ~ ' ' ~ t.slug)|lower %}
+          {% if t._open %}
+          <a class="card" href="{{ t._open }}"{% if t._open_blank %} target="_blank" rel="noopener"{% endif %} data-search="{{ ds }}">
+            {{ card_body(t) }}
+            <span class="hint">열기 →</span>
+          </a>
+          {% else %}
+          <div class="card is-off" data-search="{{ ds }}">
+            {{ card_body(t) }}
+            <span class="hint off">{% if t._needs_deps %}설치 필요 — <code>pip install -r requirements.txt</code> 다시{% else %}준비중{% endif %}</span>
           </div>
           {% endif %}
-
-          {% if t.replaces %}
-          <p class="replaces"><span class="repl-label">대체</span> {{ t.replaces }}</p>
-          {% endif %}
-
-          <div class="card-foot">
-            {% if t._open %}
-              <a class="open" href="{{ t._open }}"{% if t._open_blank %} target="_blank" rel="noopener"{% endif %}>열기 →</a>
-            {% else %}
-              <span class="open dim">준비중</span>
-            {% endif %}
-          </div>
-        </article>
         {% endfor %}
       </div>
     </section>
@@ -75,18 +67,18 @@
 
   <script>
     const q = document.getElementById('q');
-    const cards = [...document.querySelectorAll('.card')];
+    const cards = [...document.querySelectorAll('.card, .card.is-off')];
     const cats = [...document.querySelectorAll('.category')];
     const noresult = document.getElementById('noresult');
     function applyFilter() {
       const term = q.value.trim().toLowerCase();
       let shown = 0;
       for (const c of cards) {
-        const hit = !term || c.dataset.search.includes(term);
+        const hit = !term || (c.dataset.search || '').includes(term);
         c.hidden = !hit; if (hit) shown++;
       }
       for (const sec of cats) {
-        sec.hidden = ![...sec.querySelectorAll('.card')].some(c => !c.hidden);
+        sec.hidden = ![...sec.querySelectorAll('[data-search]')].some(c => !c.hidden);
       }
       noresult.hidden = shown !== 0;
     }
