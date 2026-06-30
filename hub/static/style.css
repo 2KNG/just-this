@@ -43,6 +43,35 @@ body {
 .manifesto { margin: 0.6rem auto 0; color: var(--fg-dim); max-width: 36rem; }
 .count { margin-top: 0.9rem; color: var(--fg-dim); font-size: 0.9rem; }
 .count strong { color: var(--accent); }
+.live { color: var(--ok); }
+.oneshot {
+  margin: 1rem auto 0;
+  max-width: 40rem;
+  color: var(--fg-dim);
+  font-size: 0.86rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+}
+.oneshot code {
+  background: #0b0e13;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.1rem 0.4rem;
+  color: #c9d4e0;
+}
+.dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+  margin-right: 0.45rem;
+  box-shadow: 0 0 6px var(--ok);
+  vertical-align: middle;
+}
+.card.mounted { border-color: #234; }
+.open.dim { color: var(--fg-dim); cursor: default; }
 
 .searchbar {
   position: sticky;

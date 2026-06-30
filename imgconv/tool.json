@@ -1,0 +1,12 @@
+{
+  "name": "이미지 변환·자르기",
+  "slug": "imgconv",
+  "category": "문서",
+  "description": "HEIC(아이폰)·PNG·JPG·WEBP 등 이미지를 무손실 우선으로 형식변환하고, 마우스로 자르고, 리사이즈하고, 메타데이터(EXIF·GPS)까지 제거하는 웹앱. 여러 장은 한 번에 zip.",
+  "lang": "python",
+  "type": "web",
+  "run": "uvicorn app:app",
+  "entry": "/imgconv/",
+  "tags": ["image", "convert", "crop", "resize", "heic", "exif"],
+  "replaces": "온라인 이미지 변환·자르기 사이트 (배치 제한·워터마크·광고)"
+}

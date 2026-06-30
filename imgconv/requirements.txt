@@ -1,0 +1,5 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pillow>=10.2
+pillow-heif>=0.16
+python-multipart>=0.0.9

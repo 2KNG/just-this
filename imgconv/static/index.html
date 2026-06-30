@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>이미지 변환·자르기 — just-this</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+  <style>
+    :root{--bg:#0e1116;--card:#171c23;--border:#262d38;--fg:#e6edf3;--dim:#9aa6b2;--accent:#4f9cf9;--ok:#3fb950;--warn:#d29922;--r:12px}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Noto Sans KR",Roboto,Arial,sans-serif;line-height:1.5}
+    a{color:var(--accent);text-decoration:none}
+    header{padding:1.2rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:baseline;gap:.8rem;flex-wrap:wrap}
+    header h1{margin:0;font-size:1.3rem}
+    header .sub{color:var(--dim);font-size:.85rem}
+    .wrap{max-width:60rem;margin:0 auto;padding:1.2rem 1rem 4rem}
+    .drop{border:2px dashed var(--border);border-radius:var(--r);padding:2rem 1rem;text-align:center;color:var(--dim);cursor:pointer;transition:.15s}
+    .drop:hover,.drop.over{border-color:var(--accent);color:var(--fg);background:var(--card)}
+    .drop input{display:none}
+    .stage{margin-top:1.2rem;display:none}
+    .stage.on{display:block}
+    .crop-area{background:#0b0e13;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;max-height:60vh}
+    .crop-area img{display:block;max-width:100%}
+    .multi-note{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:1rem;color:var(--dim)}
+    .thumbs{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.8rem}
+    .thumbs img{height:64px;border-radius:8px;border:1px solid var(--border)}
+    .row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin:.5rem 0}
+    .row>label{min-width:6.5rem;color:var(--dim);font-size:.9rem}
+    .aspects button,.ghost{background:var(--card);color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:.35rem .7rem;cursor:pointer;font-size:.85rem}
+    .aspects button.sel{border-color:var(--accent);color:var(--accent)}
+    select,input[type=number],input[type=text]{background:var(--card);color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:.4rem .6rem;font-size:.9rem}
+    input[type=range]{accent-color:var(--accent)}
+    input[type=color]{width:38px;height:30px;background:none;border:1px solid var(--border);border-radius:8px;padding:0}
+    .panel{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.1rem;margin-top:1.2rem}
+    .panel h3{margin:.1rem 0 .8rem;font-size:1rem}
+    .go{display:block;width:100%;margin-top:1.2rem;padding:.85rem;font-size:1.05rem;font-weight:700;color:#06121f;background:var(--accent);border:none;border-radius:var(--r);cursor:pointer}
+    .go:disabled{opacity:.5;cursor:default}
+    .status{margin-top:1rem;color:var(--dim);font-size:.9rem;min-height:1.2em}
+    .status.err{color:var(--warn)}.status.ok{color:var(--ok)}
+    .muted{color:var(--dim);font-size:.85rem}
+    .hide{display:none}
+    .toggle{display:flex;align-items:center;gap:.4rem;cursor:pointer;user-select:none}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>이미지 변환·자르기</h1>
+    <span class="sub">형식변환 · 자르기 · 리사이즈 · 메타데이터 제거 — 원본 화질 보존</span>
+    <a href="../" style="margin-left:auto">← 창고</a>
+  </header>
+
+  <div class="wrap">
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept="image/*,.heic,.heif" multiple>
+      <div><strong>이미지를 끌어다 놓거나 클릭</strong></div>
+      <div class="muted">HEIC(아이폰) · PNG · JPG · WEBP · BMP · TIFF · GIF · 여러 장 가능</div>
+    </label>
+
+    <!-- 한 장: 자르기 -->
+    <section class="stage" id="single">
+      <div class="row">
+        <span class="toggle"><input type="checkbox" id="useCrop"> <label for="useCrop" style="cursor:pointer">자르기 사용</label></span>
+        <span class="aspects" id="aspects" style="display:none">
+          <button data-ar="0" class="sel">자유</button>
+          <button data-ar="1">1:1</button>
+          <button data-ar="1.3333">4:3</button>
+          <button data-ar="1.7778">16:9</button>
+          <button data-ar="0.7071">A4</button>
+        </span>
+      </div>
+      <div class="crop-area" id="cropWrap" style="display:none"><img id="cropImg" alt=""></div>
+    </section>
+
+    <!-- 여러 장 -->
+    <section class="stage" id="multi">
+      <div class="multi-note">여러 장(<span id="nfiles">0</span>개) 선택됨 — 형식·리사이즈·메타데이터를 <strong>일괄</strong> 적용해 <strong>zip</strong>으로. (자르기는 한 장일 때만)</div>
+      <div class="thumbs" id="thumbs"></div>
+    </section>
+
+    <div class="panel">
+      <h3>옵션</h3>
+      <div class="row">
+        <label>출력 형식</label>
+        <select id="fmt">
+          <option value="keep">원본 유지</option>
+          <option value="png">PNG (무손실)</option>
+          <option value="jpg">JPG</option>
+          <option value="webp">WEBP</option>
+        </select>
+      </div>
+      <div class="row" id="qualityRow">
+        <label>품질</label>
+        <input type="range" id="quality" min="1" max="100" value="92">
+        <span id="qval" class="muted">92</span>
+        <span class="toggle hide" id="webpLLwrap"><input type="checkbox" id="webpLL"> <label for="webpLL" style="cursor:pointer">WEBP 무손실</label></span>
+      </div>
+      <div class="row">
+        <label>리사이즈</label>
+        <select id="rmode">
+          <option value="none">없음 (원본 크기)</option>
+          <option value="longest">긴 변 기준</option>
+          <option value="width">가로 기준</option>
+          <option value="height">세로 기준</option>
+          <option value="percent">퍼센트</option>
+        </select>
+        <input type="number" id="rval" min="1" value="1920" class="hide" style="width:7rem">
+        <span class="muted hide" id="runit">px</span>
+      </div>
+      <div class="row">
+        <span class="toggle"><input type="checkbox" id="strip" checked> <label for="strip" style="cursor:pointer">메타데이터(EXIF·GPS) 제거</label></span>
+      </div>
+      <div class="row" id="bgRow">
+        <label>JPG 배경</label>
+        <input type="color" id="bg" value="#ffffff">
+        <span class="muted">투명 이미지를 JPG로 바꿀 때 채울 색</span>
+      </div>
+    </div>
+
+    <button class="go" id="go" disabled>변환 · 다운로드</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+  <script>
+  const $ = s => document.querySelector(s);
+  let files = [], cropper = null;
+
+  const fileInput=$('#file'), drop=$('#drop'), go=$('#go'), status=$('#status');
+
+  // 드래그&드롭
+  ['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over')}));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over')}));
+  drop.addEventListener('drop',e=>{ if(e.dataTransfer.files.length){ setFiles([...e.dataTransfer.files]); } });
+  fileInput.addEventListener('change',()=>setFiles([...fileInput.files]));
+
+  function setFiles(list){
+    files = list.filter(f=>/^image\//.test(f.type) || /\.(heic|heif|bmp|tif|tiff|gif)$/i.test(f.name));
+    if(!files.length){ status.textContent='이미지 파일이 아님'; status.className='status err'; return; }
+    status.textContent=''; status.className='status';
+    go.disabled=false;
+    if(cropper){ cropper.destroy(); cropper=null; }
+    const single=$('#single'), multi=$('#multi');
+    if(files.length===1){
+      multi.classList.remove('on'); single.classList.add('on');
+      $('#useCrop').checked=false; $('#aspects').style.display='none'; $('#cropWrap').style.display='none';
+    } else {
+      single.classList.remove('on'); multi.classList.add('on');
+      $('#nfiles').textContent=files.length;
+      const t=$('#thumbs'); t.innerHTML='';
+      files.slice(0,24).forEach(f=>{ const img=new Image(); img.src=URL.createObjectURL(f); t.appendChild(img); });
+    }
+  }
+
+  // 자르기 토글
+  $('#useCrop').addEventListener('change',e=>{
+    const on=e.target.checked;
+    $('#aspects').style.display = on?'inline-block':'none';
+    $('#cropWrap').style.display = on?'block':'none';
+    if(on && files[0]){
+      const img=$('#cropImg'); img.src=URL.createObjectURL(files[0]);
+      img.onload=()=>{ if(cropper)cropper.destroy(); cropper=new Cropper(img,{viewMode:1,autoCropArea:1,checkOrientation:false,background:false}); };
+    } else if(cropper){ cropper.destroy(); cropper=null; }
+  });
+  // 종횡비 버튼
+  $('#aspects').addEventListener('click',e=>{
+    const b=e.target.closest('button'); if(!b||!cropper)return;
+    [...$('#aspects').children].forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
+    cropper.setAspectRatio(parseFloat(b.dataset.ar)||NaN);
+  });
+
+  // 옵션 상호작용
+  const fmt=$('#fmt'), quality=$('#quality'), qval=$('#qval');
+  function syncFmt(){
+    const f=fmt.value;
+    const lossy = f==='jpg'||f==='webp'||f==='keep';
+    $('#qualityRow').style.display = lossy?'flex':'none';
+    $('#webpLLwrap').classList.toggle('hide', f!=='webp');
+    $('#bgRow').style.display = (f==='jpg')?'flex':'none';
+  }
+  fmt.addEventListener('change',syncFmt); syncFmt();
+  quality.addEventListener('input',()=>qval.textContent=quality.value);
+  const rmode=$('#rmode');
+  rmode.addEventListener('change',()=>{
+    const on=rmode.value!=='none';
+    $('#rval').classList.toggle('hide',!on); $('#runit').classList.toggle('hide',!on);
+    $('#runit').textContent = rmode.value==='percent'?'%':'px';
+    if(rmode.value==='percent' && +$('#rval').value>100) $('#rval').value=100;
+  });
+
+  // 변환
+  go.addEventListener('click',async()=>{
+    if(!files.length)return;
+    go.disabled=true; status.className='status'; status.textContent='변환 중…';
+    const opt={
+      fmt:fmt.value, quality:+quality.value, webp_lossless:$('#webpLL').checked,
+      resize_mode:rmode.value, resize_value:+$('#rval').value,
+      strip_meta:$('#strip').checked, bg:$('#bg').value
+    };
+    if(files.length===1 && $('#useCrop').checked && cropper){
+      const d=cropper.getData(true); opt.crop=[d.x,d.y,d.width,d.height];
+    }
+    const fd=new FormData();
+    files.forEach(f=>fd.append('files',f,f.name));
+    fd.append('options',JSON.stringify(opt));
+    try{
+      const res=await fetch('api/convert',{method:'POST',body:fd});
+      if(!res.ok){ const t=await res.text(); throw new Error(t||('HTTP '+res.status)); }
+      const blob=await res.blob();
+      const cd=res.headers.get('Content-Disposition')||'';
+      let name=(cd.match(/filename\*=UTF-8''([^;]+)/)||[])[1];
+      name = name?decodeURIComponent(name):((cd.match(/filename="?([^"]+)"?/)||[])[1]||'output');
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
+      const skipped=res.headers.get('X-Skipped');
+      status.className='status ok';
+      status.textContent='완료 — '+name+(skipped?(' (일부 건너뜀: '+decodeURIComponent(skipped)+')'):'');
+    }catch(err){ status.className='status err'; status.textContent='실패: '+err.message; }
+    go.disabled=false;
+  });
+  </script>
+</body>
+</html>

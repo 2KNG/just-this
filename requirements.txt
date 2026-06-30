@@ -1,0 +1,11 @@
+# just-this — 모든 도구 의존성을 한 번에 설치한다.
+#   pip install -r requirements.txt
+#
+# 각 도구는 자기 폴더 안에 requirements.txt 를 따로 두고(격리),
+# 이 루트 파일이 그걸 전부 모아서 받는다. 새 도구를 추가하면 아래 한 줄만 더한다.
+
+-r hub/requirements.txt
+-r imgconv/requirements.txt
+
+# webcrop: 실제 앱 코드 복구 후 주석 해제
+# -r webcrop/requirements.txt

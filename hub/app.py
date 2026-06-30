@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """
-just-this 허브 — 레포의 모든 tool.json을 자동으로 읽어 한 페이지 대시보드로 보여준다.
+just-this 허브 — 레포의 모든 도구를 한 서버에 모아 띄우는 셀프호스팅 대시보드.
 
-도구 창고의 '현관'. 새 도구를 폴더 + tool.json 으로 추가하면 여기 자동으로 뜬다.
-(루트 README의 정적 메뉴와 같은 데이터(tool.json)를 쓰되, 이쪽은 살아있는 웹 버전.)
+핵심: 각 도구(FastAPI 웹앱)를 서브앱으로 '마운트'한다.
+  → 루트에서 requirements 한 번 설치하고 이 허브 하나만 띄우면
+    대시보드(/)와 모든 도구(/imgconv/, /webcrop/ …)가 같은 포트에서 다 돈다.
 
-실행:
+실행 (루트에서):
     pip install -r requirements.txt
-    uvicorn app:app                 # http://localhost:8000
-    uvicorn app:app --host 0.0.0.0  # 같은 네트워크에 공유
+    python run.py                       # http://localhost:8000
+    # 또는: uvicorn hub.app:app --host 0.0.0.0 --port 8000
 """
 
+import importlib
 import os
 import sys
 
@@ -30,6 +32,33 @@ app = FastAPI(title="just-this 허브")
 app.mount("/static", StaticFiles(directory=os.path.join(HERE, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(HERE, "templates"))
 
+MOUNTED = {}  # slug -> True : 서브앱으로 마운트 성공한 도구
+
+
+def mount_tools():
+    """python 웹 도구들을 /{slug} 로 마운트. 코드가 없거나 import 실패하면 건너뛴다."""
+    for t in index.load_tools():
+        slug = t.get("slug")
+        if not slug or slug == "hub":
+            continue
+        if t.get("lang") != "python" or t.get("type") != "web":
+            continue
+        if not os.path.isfile(os.path.join(ROOT, slug, "app.py")):
+            continue  # 아직 코드 없음 (예: 메타데이터만 있는 도구)
+        try:
+            mod = importlib.import_module(f"{slug}.app")
+            subapp = getattr(mod, "app", None)
+            if subapp is None:
+                continue
+            app.mount(f"/{slug}", subapp)
+            MOUNTED[slug] = True
+            print(f"[hub] mounted /{slug}", file=sys.stderr)
+        except Exception as e:  # 의존성 미설치 등 — 허브는 계속 뜬다
+            print(f"[hub] /{slug} 마운트 실패: {e}", file=sys.stderr)
+
+
+mount_tools()
+
 
 def cat_key(c):
     order = index.CATEGORY_ORDER
@@ -37,8 +66,26 @@ def cat_key(c):
 
 
 def discover():
-    """tool.json 들을 읽어 (전체목록, 카테고리별 그룹) 을 돌려준다. 매 요청마다 새로 읽어 항상 최신."""
-    tools = index.load_tools()  # ROOT 의 */tool.json 스캔
+    """tool.json 들을 읽어 (전체수, 카테고리별 그룹, 마운트수) 반환. 매 요청마다 새로 읽어 항상 최신."""
+    tools = index.load_tools()
+    for t in tools:
+        slug = t.get("slug", "")
+        t["_mounted"] = slug in MOUNTED
+        is_py_web = t.get("lang") == "python" and t.get("type") == "web"
+        has_app = bool(slug) and os.path.isfile(os.path.join(ROOT, slug, "app.py"))
+        if t["_mounted"]:
+            t["_open"] = f"/{slug}/"
+            t["_open_blank"] = False
+        elif is_py_web and not has_app:
+            # python 웹 도구인데 코드가 아직 없음 → 마운트 불가, 외부 링크도 무의미
+            t["_open"] = None
+            t["_open_blank"] = False
+        elif t.get("entry") and str(t["entry"]).startswith("http"):
+            t["_open"] = t["entry"]
+            t["_open_blank"] = True
+        else:
+            t["_open"] = None
+            t["_open_blank"] = False
     groups = {}
     for t in tools:
         groups.setdefault(t.get("category", "기타"), []).append(t)
@@ -46,26 +93,27 @@ def discover():
         (cat, sorted(groups[cat], key=lambda t: t.get("slug", "")))
         for cat in sorted(groups, key=cat_key)
     ]
-    return tools, ordered
+    return len(tools), ordered, sum(1 for t in tools if t["_mounted"])
 
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    tools, ordered = discover()
+    total, ordered, mounted = discover()
     return templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={"groups": ordered, "total": len(tools)},
+        context={"groups": ordered, "total": total, "mounted": mounted},
     )
 
 
 @app.get("/api/tools")
 def api_tools():
-    """도구 메타데이터 JSON. 다른 데서 프로그램으로 긁어 쓸 때."""
-    tools, _ = discover()
-    return JSONResponse({"total": len(tools), "tools": tools})
+    """도구 메타데이터 JSON."""
+    total, ordered, mounted = discover()
+    tools = [t for _cat, items in ordered for t in items]
+    return JSONResponse({"total": total, "mounted": mounted, "tools": tools})
 
 
 @app.get("/healthz")
 def healthz():
-    return {"ok": True}
+    return {"ok": True, "mounted": sorted(MOUNTED)}
