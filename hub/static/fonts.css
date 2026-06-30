@@ -1,0 +1,19 @@
+/* Nanum Myeongjo (명조) — 로컬 vendoring. 외부 CDN 의존 없음.
+   허브가 /static 을 루트에서 서빙하므로 절대경로로 모든 페이지(도구 포함)에서 공유. */
+
+/* 라틴: unicode-range 없이 기본값으로(모든 문자 폴백). 한글은 아래에서 덮어씀. */
+@font-face{font-family:'Nanum Myeongjo';font-style:normal;font-weight:400;font-display:swap;
+  src:url(/static/fonts/nanum-myeongjo-latin-400.woff2) format('woff2');}
+@font-face{font-family:'Nanum Myeongjo';font-style:normal;font-weight:700;font-display:swap;
+  src:url(/static/fonts/nanum-myeongjo-latin-700.woff2) format('woff2');}
+@font-face{font-family:'Nanum Myeongjo';font-style:normal;font-weight:800;font-display:swap;
+  src:url(/static/fonts/nanum-myeongjo-latin-800.woff2) format('woff2');}
+
+/* 한글(+CJK 기호/완성형) — 이 범위는 한글 파일로. 라틴 뒤에 선언해 우선 적용. */
+@font-face{font-family:'Nanum Myeongjo';font-style:normal;font-weight:400;font-display:swap;
+  src:url(/static/fonts/nanum-myeongjo-korean-400.woff2) format('woff2');
+  unicode-range:U+1100-11FF,U+3000-303F,U+3130-318F,U+A960-A97F,U+AC00-D7A3,U+D7B0-D7FF,U+FF00-FFEF;}
+@font-face{font-family:'Nanum Myeongjo';font-style:normal;font-weight:700;font-display:swap;
+  src:url(/static/fonts/nanum-myeongjo-korean-700.woff2) format('woff2');
+  unicode-range:U+1100-11FF,U+3000-303F,U+3130-318F,U+A960-A97F,U+AC00-D7A3,U+D7B0-D7FF,U+FF00-FFEF;}
+/* 800 한글이 필요한 곳은 700으로 대체(헤딩은 라틴 800 + 한글 700) */

@@ -4,15 +4,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>이미지 변환·자르기 — just-this</title>
+  <link rel="stylesheet" href="/static/fonts.css">
   <link rel="stylesheet" href="static/cropper.min.css">
   <style>
-    :root{--bg:#eaf0f7;--card:#ffffff;--surface2:#f4f7fb;--border:#d6e0ec;--fg:#16263d;--dim:#5e7088;--primary:#0f63ad;--primary-d:#0a4d89;--accent:#37a3df;--ok:#1a9e5f;--warn:#c2410c;--r:12px;--shadow:0 1px 3px rgba(20,50,90,.08),0 6px 20px rgba(20,50,90,.06)}
+    :root{--bg:#eaf0f7;--card:#ffffff;--surface2:#f4f7fb;--border:#d6e0ec;--fg:#16263d;--dim:#5e7088;--primary:#0f63ad;--primary-d:#0a4d89;--accent:#37a3df;--ok:#1a9e5f;--warn:#c2410c;--r:12px;--shadow:0 1px 3px rgba(20,50,90,.08),0 6px 20px rgba(20,50,90,.06);--serif:"Nanum Myeongjo","AppleMyungjo",Batang,"Batang Che",Gungsuh,serif}
     *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Noto Sans KR",Roboto,Arial,sans-serif;line-height:1.5}
-    a{color:var(--accent);text-decoration:none}
-    header{padding:1.2rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:baseline;gap:.8rem;flex-wrap:wrap}
-    header h1{margin:0;font-size:1.3rem}
-    header .sub{color:var(--dim);font-size:.85rem}
+    body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--serif);line-height:1.6}
+    a{color:var(--primary);text-decoration:none}
+    .nav{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:1.2rem;padding:0 1.4rem;height:60px;background:var(--card);border-bottom:1px solid var(--border);box-shadow:0 1px 8px rgba(20,50,90,.05)}
+    .nav-brand{font-weight:800;font-size:1.4rem;color:var(--primary);text-decoration:none}
+    .nav-links{display:flex;gap:.25rem;flex-wrap:wrap}
+    .nav-links a{color:var(--fg);text-decoration:none;padding:.42rem .8rem;border-radius:9px;font-size:1rem}
+    .nav-links a:hover{background:var(--surface2);color:var(--primary)}
+    .nav-links a.cur{background:var(--primary);color:#fff}
+    .pagehead{max-width:60rem;margin:0 auto;padding:1.2rem 1rem .2rem;display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap}
+    .pagehead h1{margin:0;font-size:1.4rem;color:var(--primary-d)}
+    .pagehead .sub{color:var(--dim);font-size:.88rem}
     .wrap{max-width:60rem;margin:0 auto;padding:1.2rem 1rem 4rem}
     .drop{border:2px dashed var(--border);border-radius:var(--r);padding:2rem 1rem;text-align:center;color:var(--dim);cursor:pointer;transition:.15s}
     .drop:hover,.drop.over{border-color:var(--accent);color:var(--fg);background:var(--card)}
@@ -28,6 +35,7 @@
     .row>label{min-width:6.5rem;color:var(--dim);font-size:.9rem}
     .aspects button,.ghost{background:var(--card);color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:.35rem .7rem;cursor:pointer;font-size:.85rem}
     .aspects button.sel{border-color:var(--accent);color:var(--accent)}
+    button,select,input{font-family:inherit}
     select,input[type=number],input[type=text]{background:var(--card);color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:.4rem .6rem;font-size:.9rem}
     input[type=range]{accent-color:var(--accent)}
     input[type=color]{width:38px;height:30px;background:none;border:1px solid var(--border);border-radius:8px;padding:0}
@@ -44,11 +52,14 @@
   </style>
 </head>
 <body>
-  <header>
+  <nav class="nav">
+    <a class="nav-brand" href="../">just-this</a>
+    <div class="nav-links" id="nav"></div>
+  </nav>
+  <div class="pagehead">
     <h1>이미지 변환·자르기</h1>
     <span class="sub">형식변환 · 자르기 · 리사이즈 · 메타데이터 제거 — 원본 화질 보존</span>
-    <a href="../" style="margin-left:auto">← 창고</a>
-  </header>
+  </div>
 
   <div class="wrap">
     <label class="drop" id="drop">
@@ -124,6 +135,8 @@
   <script src="static/cropper.min.js"></script>
   <script>
   const $ = s => document.querySelector(s);
+  // 상단 네비: 허브의 도구 목록을 받아 채움 (단독 실행이면 조용히 생략)
+  fetch('/api/tools').then(r=>r.json()).then(d=>{const n=document.getElementById('nav');(d.tools||[]).forEach(t=>{if(!t._open)return;const a=document.createElement('a');a.href=t._open;a.textContent=t.short||t.name;if(t.slug==='imgconv')a.className='cur';n.appendChild(a);});}).catch(()=>{});
   let files = [], cropper = null;
 
   const fileInput=$('#file'), drop=$('#drop'), go=$('#go'), status=$('#status');

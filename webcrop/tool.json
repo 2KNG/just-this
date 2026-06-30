@@ -1,5 +1,6 @@
 {
   "name": "PDF·문서 자르기·회전·변환",
+  "short": "PDF 편집",
   "slug": "webcrop",
   "category": "문서",
   "description": "PDF·스캔 이미지를 회전·자동 기울기 보정(deskew)하고, 마우스로 영역을 잘라 A4·Letter·명함 등 표준 용지 규격에 맞춘 뒤 PDF/PNG/JPG로 변환하는 웹앱.",

@@ -4,16 +4,28 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>just-this — 도구 창고</title>
+  <link rel="stylesheet" href="/static/fonts.css">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <header class="hero">
-    <h1>just&#8209;this</h1>
-    <p class="manifesto">검색하고, 광고 보고, 결제하느라 시간 버리는 짓 그만.<br>필요한 도구만 직접 만들어 쓰는 개인 창고.</p>
-  </header>
+  <nav class="nav">
+    <a class="nav-brand" href="/">just-this</a>
+    <div class="nav-links">
+      {% for cat, items in groups %}{% for t in items %}
+        {% if t._open %}<a href="{{ t._open }}"{% if t._open_blank %} target="_blank" rel="noopener"{% endif %}>{{ t.short or t.name }}</a>{% endif %}
+      {% endfor %}{% endfor %}
+    </div>
+    <div class="nav-right">
+      <a href="https://github.com/2KNG/just-this" target="_blank" rel="noopener">GitHub ↗</a>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <p class="manifesto">검색하고, 광고 보고, 결제하느라 시간 버리는 짓 그만. 필요한 도구만 직접 만들어 쓰는 개인 창고.</p>
+  </div>
 
   <div class="searchbar">
-    <input id="q" type="search" placeholder="도구 검색 — 이름 / 설명 / 태그…" autocomplete="off" autofocus>
+    <input id="q" type="search" placeholder="도구 검색 — 이름 / 설명 / 태그…" autocomplete="off">
   </div>
 
   <main id="catalog">
@@ -30,9 +42,7 @@
                  data-search="{{ (t.name ~ ' ' ~ t.description ~ ' ' ~ (t.tags|join(' ') if t.tags else '') ~ ' ' ~ t.slug)|lower }}">
           <div class="card-head">
             <h3 class="card-title">{{ t.name }}</h3>
-            <div class="badges">
-              {% if t.type %}<span class="badge type">{{ t.type }}</span>{% endif %}
-            </div>
+            {% if t.type %}<span class="badge type">{{ t.type }}</span>{% endif %}
           </div>
 
           <p class="desc">{{ t.description }}</p>
@@ -63,27 +73,20 @@
 
   <p id="noresult" class="empty" hidden>검색 결과 없음.</p>
 
-  <footer class="foot">
-    <a href="https://github.com/2KNG/just-this" target="_blank" rel="noopener">GitHub</a>
-  </footer>
-
   <script>
     const q = document.getElementById('q');
     const cards = [...document.querySelectorAll('.card')];
     const cats = [...document.querySelectorAll('.category')];
     const noresult = document.getElementById('noresult');
-
     function applyFilter() {
       const term = q.value.trim().toLowerCase();
       let shown = 0;
       for (const c of cards) {
         const hit = !term || c.dataset.search.includes(term);
-        c.hidden = !hit;
-        if (hit) shown++;
+        c.hidden = !hit; if (hit) shown++;
       }
       for (const sec of cats) {
-        const any = [...sec.querySelectorAll('.card')].some(c => !c.hidden);
-        sec.hidden = !any;
+        sec.hidden = ![...sec.querySelectorAll('.card')].some(c => !c.hidden);
       }
       noresult.hidden = shown !== 0;
     }

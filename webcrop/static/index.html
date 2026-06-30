@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PDF·문서 자르기·회전·변환 — just-this</title>
+  <link rel="stylesheet" href="/static/fonts.css">
   <link rel="stylesheet" href="static/cropper.min.css">
   <style>
     :root{
@@ -11,14 +12,22 @@
       --fg:#16263d;--dim:#5e7088;--primary:#0f63ad;--primary-d:#0a4d89;
       --accent:#37a3df;--ok:#1a9e5f;--warn:#c2410c;
       --shadow:0 1px 3px rgba(20,50,90,.08),0 6px 20px rgba(20,50,90,.06);--r:12px;
+      --serif:"Nanum Myeongjo","AppleMyungjo",Batang,"Batang Che",Gungsuh,serif;
     }
     *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Noto Sans KR",Roboto,Arial,sans-serif;line-height:1.5}
+    body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--serif);line-height:1.6}
+    button,select,input{font-family:inherit}
     a{color:var(--primary);text-decoration:none}
-    header{background:var(--surface);border-bottom:1px solid var(--border);padding:1.1rem 1.2rem;display:flex;align-items:baseline;gap:.8rem;flex-wrap:wrap}
-    header h1{margin:0;font-size:1.25rem;color:var(--primary)}
-    header .sub{color:var(--dim);font-size:.85rem}
-    .wrap{max-width:64rem;margin:0 auto;padding:1.2rem 1rem 5rem}
+    .nav{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:1.2rem;padding:0 1.4rem;height:60px;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:0 1px 8px rgba(20,50,90,.05)}
+    .nav-brand{font-weight:800;font-size:1.4rem;color:var(--primary);text-decoration:none}
+    .nav-links{display:flex;gap:.25rem;flex-wrap:wrap}
+    .nav-links a{color:var(--fg);text-decoration:none;padding:.42rem .8rem;border-radius:9px;font-size:1rem}
+    .nav-links a:hover{background:var(--surface2);color:var(--primary)}
+    .nav-links a.cur{background:var(--primary);color:#fff}
+    .pagehead{max-width:64rem;margin:0 auto;padding:1.2rem 1rem .2rem;display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap}
+    .pagehead h1{margin:0;font-size:1.4rem;color:var(--primary-d)}
+    .pagehead .sub{color:var(--dim);font-size:.88rem}
+    .wrap{max-width:64rem;margin:0 auto;padding:1rem 1rem 5rem}
     .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);padding:1.1rem 1.2rem;margin-bottom:1.1rem}
     .panel h2{margin:.1rem 0 .9rem;font-size:1.02rem}
     .row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin:.55rem 0}
@@ -51,11 +60,14 @@
   </style>
 </head>
 <body>
-  <header>
+  <nav class="nav">
+    <a class="nav-brand" href="../">just-this</a>
+    <div class="nav-links" id="nav"></div>
+  </nav>
+  <div class="pagehead">
     <h1>PDF·문서 자르기·회전·변환</h1>
     <span class="sub">기울기 보정 · 회전 · 자르기 · A4/Letter/명함 맞춤 · PDF/PNG/JPG</span>
-    <a href="../" style="margin-left:auto">← 창고</a>
-  </header>
+  </div>
 
   <div class="wrap">
     <!-- 1. 업로드 + 보정 -->
@@ -120,10 +132,14 @@
           <button data-f="png">PNG</button>
           <button data-f="jpg">JPG</button>
         </span>
-        <label class="k" style="min-width:auto">품질</label>
-        <input type="range" id="quality" min="40" max="100" value="92" style="width:10rem">
-        <span class="muted" id="qVal">92</span>
+        <label class="k" style="min-width:auto">화질</label>
+        <select id="quality2">
+          <option value="lossless">원본 (무손실) — 자른 픽셀 그대로</option>
+          <option value="95">고품질 (JPEG 95, 작게)</option>
+          <option value="80">표준 (JPEG 80, 더 작게)</option>
+        </select>
       </div>
+      <p class="muted" style="margin:.2rem 0 0">크롭은 항상 원본 픽셀을 그대로 잘라냅니다. ‘원본(무손실)’이면 PDF엔 PNG로 임베드돼 화질 손실 0.</p>
       <button class="btn go" id="convertBtn">변환 · 다운로드</button>
       <div class="status" id="status"></div>
     </section>
@@ -132,6 +148,8 @@
   <script src="static/cropper.min.js"></script>
   <script>
   const $=s=>document.querySelector(s);
+  // 상단 네비: 허브의 도구 목록을 받아 채움 (단독 실행이면 조용히 생략)
+  fetch('/api/tools').then(r=>r.json()).then(d=>{const n=document.getElementById('nav');(d.tools||[]).forEach(t=>{if(!t._open)return;const a=document.createElement('a');a.href=t._open;a.textContent=t.short||t.name;if(t.slug==='webcrop')a.className='cur';n.appendChild(a);});}).catch(()=>{});
   const PAPERS={a3:[297,420],a4:[210,297],a5:[148,210],letter:[215.9,279.4],legal:[215.9,355.6],tabloid:[279.4,431.8],card:[90,50],card_us:[88.9,50.8]};
   let selectedFile=null, token=null, pages=[], orientVal=0;
 
@@ -151,7 +169,6 @@
   let paperMode='crop', fmt='pdf';
   $('#paperMode').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$('#paperMode').children].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');paperMode=b.dataset.m;});
   $('#fmt').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$('#fmt').children].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');fmt=b.dataset.f;});
-  $('#quality').addEventListener('input',e=>$('#qVal').textContent=e.target.value);
   $('#paper').addEventListener('change',applyRatio);
   $('#landscape').addEventListener('change',applyRatio);
 
@@ -205,7 +222,9 @@
     const fd=new FormData();
     fd.append('token',token); fd.append('fmt',fmt);
     fd.append('paper',$('#paper').value); fd.append('paper_mode',paperMode);
-    fd.append('landscape',$('#landscape').checked); fd.append('quality',$('#quality').value);
+    fd.append('landscape',$('#landscape').checked);
+    const qv=$('#quality2').value, lossless=qv==='lossless';
+    fd.append('lossless',lossless); fd.append('quality',lossless?100:qv);
     fd.append('crops',JSON.stringify(crops));
     try{
       const res=await fetch('api/convert',{method:'POST',body:fd});

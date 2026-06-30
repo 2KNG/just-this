@@ -31,7 +31,7 @@ from fastapi.staticfiles import StaticFiles
 
 MAX_UPLOAD_MB = 50
 SESSION_TTL_SEC = 60 * 30
-RENDER_DPI = 200
+RENDER_DPI = 300  # PDF 렌더 해상도. 이미지 입력은 원본 해상도 그대로 사용.
 HERE = os.path.dirname(os.path.abspath(__file__))
 TMP_ROOT = os.path.join(tempfile.gettempdir(), "webcrop_sessions")
 os.makedirs(TMP_ROOT, exist_ok=True)
@@ -217,7 +217,8 @@ async def convert(
     paper: str = Form(""),            # "" 또는 a4/letter/...
     paper_mode: str = Form("crop"),   # crop | fit
     landscape: bool = Form(False),
-    quality: int = Form(95),
+    lossless: bool = Form(True),      # 기본 무손실: 크롭한 픽셀을 그대로 보존
+    quality: int = Form(95),          # lossless=false 일 때만 사용 (JPEG 품질)
     dpi: int = Form(RENDER_DPI),
     crops: str = Form(""),            # JSON: [{"idx":0,"x":..,"y":..,"w":..,"h":..}, ...] (픽셀)
 ):
@@ -254,32 +255,41 @@ async def convert(
     if not out_images:
         raise HTTPException(400, "변환할 페이지가 없음")
 
+    def encode(img, want):
+        # want: 'png'(무손실) | 'jpg'(lossless면 q=100, 아니면 quality)
+        if want == "png":
+            ok, buf = cv2.imencode(".png", img, [cv2.IMWRITE_PNG_COMPRESSION, 6])
+        else:
+            q = 100 if lossless else quality
+            ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, q])
+        return buf.tobytes()
+
     if fmt == "pdf":
+        # 무손실이면 각 페이지를 PNG(FlateDecode)로 PDF에 임베드 → 크롭 픽셀 그대로.
+        # 작게 뽑고 싶으면 lossless=false (JPEG quality).
+        page_enc = "png" if lossless else "jpg"
         doc = fitz.open()
         for img in out_images:
-            ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, quality])
             hh, ww = img.shape[:2]
             pt_w, pt_h = ww * 72.0 / dpi, hh * 72.0 / dpi
             page = doc.new_page(width=pt_w, height=pt_h)
-            page.insert_image(fitz.Rect(0, 0, pt_w, pt_h), stream=buf.tobytes())
+            page.insert_image(fitz.Rect(0, 0, pt_w, pt_h), stream=encode(img, page_enc))
         out_bytes = doc.tobytes(garbage=4, deflate=True)
         doc.close()
         return Response(out_bytes, media_type="application/pdf",
                         headers={"Content-Disposition": 'attachment; filename="webcrop.pdf"'})
 
-    ext = ".jpg" if fmt == "jpg" else ".png"
-    params = [cv2.IMWRITE_JPEG_QUALITY, quality] if fmt == "jpg" else []
-    mt = "image/jpeg" if fmt == "jpg" else "image/png"
+    out_fmt = "jpg" if fmt == "jpg" else "png"  # PNG 출력은 언제나 무손실
+    ext = ".jpg" if out_fmt == "jpg" else ".png"
+    mt = "image/jpeg" if out_fmt == "jpg" else "image/png"
     if len(out_images) == 1:
-        ok, buf = cv2.imencode(ext, out_images[0], params)
-        return Response(buf.tobytes(), media_type=mt,
+        return Response(encode(out_images[0], out_fmt), media_type=mt,
                         headers={"Content-Disposition": f'attachment; filename="webcrop{ext}"'})
 
     mem = io.BytesIO()
     with zipfile.ZipFile(mem, "w", zipfile.ZIP_DEFLATED) as zf:
         for i, img in enumerate(out_images, 1):
-            ok, buf = cv2.imencode(ext, img, params)
-            zf.writestr(f"page_{i:03d}{ext}", buf.tobytes())
+            zf.writestr(f"page_{i:03d}{ext}", encode(img, out_fmt))
     mem.seek(0)
     return StreamingResponse(mem, media_type="application/zip",
                              headers={"Content-Disposition": 'attachment; filename="webcrop.zip"'})
