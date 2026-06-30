@@ -67,7 +67,8 @@ def cat_key(c):
 
 def discover():
     """tool.json 들을 읽어 (전체수, 카테고리별 그룹, 마운트수) 반환. 매 요청마다 새로 읽어 항상 최신."""
-    tools = index.load_tools()
+    # 허브 자신은 도구 목록에서 제외 (대시보드가 자기 자신을 나열할 필요 없음)
+    tools = [t for t in index.load_tools() if t.get("slug") != "hub"]
     for t in tools:
         slug = t.get("slug", "")
         t["_mounted"] = slug in MOUNTED

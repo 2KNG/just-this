@@ -9,10 +9,7 @@
 <body>
   <header class="hero">
     <h1>just&#8209;this</h1>
-    <p class="manifesto">검색하고, 광고 보고, 결제하느라 시간 버리는 짓 그만.<br>딱 필요한 도구만 직접 만들어 박아두는 개인 창고.</p>
-    <div class="count">총 <strong>{{ total }}</strong>개 도구{% if mounted %} · <span class="live">● {{ mounted }}개 실행중</span>{% endif %}</div>
-    <p class="oneshot">한 번 설치하고 한 번 실행하면 — 아래 모든 도구가 <strong>같은 서버</strong>에서 바로 돌아감.
-      <code>pip install -r requirements.txt</code> → <code>python run.py</code></p>
+    <p class="manifesto">검색하고, 광고 보고, 결제하느라 시간 버리는 짓 그만.<br>필요한 도구만 직접 만들어 쓰는 개인 창고.</p>
   </header>
 
   <div class="searchbar">
@@ -21,7 +18,7 @@
 
   <main id="catalog">
     {% if total == 0 %}
-      <p class="empty">아직 등록된 도구가 없음. <code>tool.json</code> 넣고 새로고침. (CONVENTIONS.md 참고)</p>
+      <p class="empty">아직 쓸 수 있는 도구가 없음.</p>
     {% endif %}
 
     {% for cat, items in groups %}
@@ -29,14 +26,11 @@
       <h2>{{ cat }} <span class="cat-count">{{ items|length }}</span></h2>
       <div class="grid">
         {% for t in items %}
-        <article class="card{% if t._mounted %} mounted{% endif %}"
+        <article class="card"
                  data-search="{{ (t.name ~ ' ' ~ t.description ~ ' ' ~ (t.tags|join(' ') if t.tags else '') ~ ' ' ~ t.slug)|lower }}">
           <div class="card-head">
-            <h3 class="card-title">
-              {% if t._mounted %}<span class="dot" title="실행중"></span>{% endif %}{{ t.name }}
-            </h3>
+            <h3 class="card-title">{{ t.name }}</h3>
             <div class="badges">
-              {% if t.lang %}<span class="badge lang">{{ t.lang }}</span>{% endif %}
               {% if t.type %}<span class="badge type">{{ t.type }}</span>{% endif %}
             </div>
           </div>
@@ -55,11 +49,10 @@
 
           <div class="card-foot">
             {% if t._open %}
-              <a class="open" href="{{ t._open }}"{% if t._open_blank %} target="_blank" rel="noopener"{% endif %}>열기{% if t._open_blank %} ↗{% else %} →{% endif %}</a>
+              <a class="open" href="{{ t._open }}"{% if t._open_blank %} target="_blank" rel="noopener"{% endif %}>열기 →</a>
             {% else %}
-              <span class="open dim" title="실제 코드가 아직 없음">코드 준비중</span>
+              <span class="open dim">준비중</span>
             {% endif %}
-            <a class="repo" href="https://github.com/2KNG/just-this/tree/main/{{ t.slug }}" target="_blank" rel="noopener">📁 코드</a>
           </div>
         </article>
         {% endfor %}
@@ -71,8 +64,7 @@
   <p id="noresult" class="empty" hidden>검색 결과 없음.</p>
 
   <footer class="foot">
-    <a href="https://github.com/2KNG/just-this" target="_blank" rel="noopener">2KNG/just-this</a>
-    · 새 도구는 폴더 + <code>tool.json</code> + <code>app.py</code> 만 넣고 재시작하면 여기 자동 등록·마운트
+    <a href="https://github.com/2KNG/just-this" target="_blank" rel="noopener">GitHub</a>
   </footer>
 
   <script>

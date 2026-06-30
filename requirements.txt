@@ -6,6 +6,4 @@
 
 -r hub/requirements.txt
 -r imgconv/requirements.txt
-
-# webcrop: 실제 앱 코드 복구 후 주석 해제
-# -r webcrop/requirements.txt
+-r webcrop/requirements.txt

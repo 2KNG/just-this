@@ -1,12 +1,12 @@
 {
-  "name": "문서 보정·변환",
+  "name": "PDF·문서 자르기·회전·변환",
   "slug": "webcrop",
   "category": "문서",
-  "description": "스캔 PDF/이미지를 자동 기울기 보정(deskew)하고, 마우스로 영역을 잘라 A4·Letter·명함 등 표준 용지 규격에 맞춘 뒤 PDF/PNG/JPG로 변환하는 웹앱.",
+  "description": "PDF·스캔 이미지를 회전·자동 기울기 보정(deskew)하고, 마우스로 영역을 잘라 A4·Letter·명함 등 표준 용지 규격에 맞춘 뒤 PDF/PNG/JPG로 변환하는 웹앱.",
   "lang": "python",
   "type": "web",
-  "run": "pip install -r requirements.txt && uvicorn app:app --reload",
-  "entry": "http://localhost:8000",
-  "tags": ["pdf", "image", "deskew", "crop", "convert"],
+  "run": "uvicorn app:app",
+  "entry": "/webcrop/",
+  "tags": ["pdf", "crop", "rotate", "deskew", "convert", "scan"],
   "replaces": "온라인 PDF 편집/변환 결제 사이트 (iLovePDF, Smallpdf 등 유료 기능)"
 }

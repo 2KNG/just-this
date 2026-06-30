@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>이미지 변환·자르기 — just-this</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+  <link rel="stylesheet" href="static/cropper.min.css">
   <style>
-    :root{--bg:#0e1116;--card:#171c23;--border:#262d38;--fg:#e6edf3;--dim:#9aa6b2;--accent:#4f9cf9;--ok:#3fb950;--warn:#d29922;--r:12px}
+    :root{--bg:#eaf0f7;--card:#ffffff;--surface2:#f4f7fb;--border:#d6e0ec;--fg:#16263d;--dim:#5e7088;--primary:#0f63ad;--primary-d:#0a4d89;--accent:#37a3df;--ok:#1a9e5f;--warn:#c2410c;--r:12px;--shadow:0 1px 3px rgba(20,50,90,.08),0 6px 20px rgba(20,50,90,.06)}
     *{box-sizing:border-box}
     body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Noto Sans KR",Roboto,Arial,sans-serif;line-height:1.5}
     a{color:var(--accent);text-decoration:none}
@@ -19,7 +19,7 @@
     .drop input{display:none}
     .stage{margin-top:1.2rem;display:none}
     .stage.on{display:block}
-    .crop-area{background:#0b0e13;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;max-height:60vh}
+    .crop-area{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;max-height:60vh}
     .crop-area img{display:block;max-width:100%}
     .multi-note{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:1rem;color:var(--dim)}
     .thumbs{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.8rem}
@@ -31,9 +31,10 @@
     select,input[type=number],input[type=text]{background:var(--card);color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:.4rem .6rem;font-size:.9rem}
     input[type=range]{accent-color:var(--accent)}
     input[type=color]{width:38px;height:30px;background:none;border:1px solid var(--border);border-radius:8px;padding:0}
-    .panel{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.1rem;margin-top:1.2rem}
+    .panel{background:var(--card);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);padding:1rem 1.1rem;margin-top:1.2rem}
     .panel h3{margin:.1rem 0 .8rem;font-size:1rem}
-    .go{display:block;width:100%;margin-top:1.2rem;padding:.85rem;font-size:1.05rem;font-weight:700;color:#06121f;background:var(--accent);border:none;border-radius:var(--r);cursor:pointer}
+    .go{display:block;width:100%;margin-top:1.2rem;padding:.85rem;font-size:1.05rem;font-weight:700;color:#fff;background:var(--primary);border:none;border-radius:var(--r);cursor:pointer}
+    .go:hover{background:var(--primary-d)}
     .go:disabled{opacity:.5;cursor:default}
     .status{margin-top:1rem;color:var(--dim);font-size:.9rem;min-height:1.2em}
     .status.err{color:var(--warn)}.status.ok{color:var(--ok)}
@@ -120,7 +121,7 @@
     <div class="status" id="status"></div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+  <script src="static/cropper.min.js"></script>
   <script>
   const $ = s => document.querySelector(s);
   let files = [], cropper = null;

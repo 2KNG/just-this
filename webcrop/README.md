@@ -1,6 +1,6 @@
-# 문서 보정·변환 (webcrop)
+# PDF·문서 자르기·회전·변환 (webcrop)
 
-스캔본이 틀어졌거나, PDF를 잘라서 다른 포맷으로 바꾸고 싶을 때. 온라인 변환 사이트 결제·광고 없이 로컬에서.
+PDF/스캔본을 회전·자르고 다른 포맷으로 바꾸고 싶을 때. 온라인 변환 사이트 결제·광고 없이 로컬에서.
 
 ## 기능
 - **자동 기울기 보정(deskew)** — 틀어진 스캔본 각도를 감지해 똑바로
@@ -10,14 +10,12 @@
 - **포맷 변환** — PDF / PNG / JPG 입력 → PDF / PNG / JPG 출력 (여러 장은 zip)
 
 ## 실행
+보통 **just-this 허브에 묶여서** 한 번에 돌아간다 (루트 README의 "한 번에 설치·실행"). 허브를 띄우면 `http://localhost:8000/webcrop/` 로 접속.
+
+단독으로 띄우려면:
 ```bash
 pip install -r requirements.txt
-uvicorn app:app --reload          # http://localhost:8000
-```
-
-호스팅:
-```bash
-uvicorn app:app --host 0.0.0.0 --port 8000
+uvicorn app:app            # http://localhost:8000
 ```
 
 ## 사용 흐름

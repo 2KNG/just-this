@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PDF·문서 자르기·회전·변환 — just-this</title>
+  <link rel="stylesheet" href="static/cropper.min.css">
+  <style>
+    :root{
+      --bg:#eaf0f7;--surface:#fff;--surface2:#f4f7fb;--border:#d6e0ec;
+      --fg:#16263d;--dim:#5e7088;--primary:#0f63ad;--primary-d:#0a4d89;
+      --accent:#37a3df;--ok:#1a9e5f;--warn:#c2410c;
+      --shadow:0 1px 3px rgba(20,50,90,.08),0 6px 20px rgba(20,50,90,.06);--r:12px;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Noto Sans KR",Roboto,Arial,sans-serif;line-height:1.5}
+    a{color:var(--primary);text-decoration:none}
+    header{background:var(--surface);border-bottom:1px solid var(--border);padding:1.1rem 1.2rem;display:flex;align-items:baseline;gap:.8rem;flex-wrap:wrap}
+    header h1{margin:0;font-size:1.25rem;color:var(--primary)}
+    header .sub{color:var(--dim);font-size:.85rem}
+    .wrap{max-width:64rem;margin:0 auto;padding:1.2rem 1rem 5rem}
+    .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);padding:1.1rem 1.2rem;margin-bottom:1.1rem}
+    .panel h2{margin:.1rem 0 .9rem;font-size:1.02rem}
+    .row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin:.55rem 0}
+    .row>label.k{min-width:6.5rem;color:var(--dim);font-size:.9rem}
+    .drop{border:2px dashed var(--border);border-radius:var(--r);padding:1.6rem 1rem;text-align:center;color:var(--dim);cursor:pointer;background:var(--surface2)}
+    .drop:hover,.drop.over{border-color:var(--primary);color:var(--fg)}
+    .drop input{display:none}
+    .file-name{color:var(--fg);font-weight:600}
+    select,input[type=number],input[type=text]{background:var(--surface);color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:.4rem .6rem;font-size:.9rem}
+    input[type=range]{accent-color:var(--primary)}
+    .seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+    .seg button{background:var(--surface);color:var(--fg);border:0;border-left:1px solid var(--border);padding:.4rem .75rem;cursor:pointer;font-size:.9rem}
+    .seg button:first-child{border-left:0}
+    .seg button.sel{background:var(--primary);color:#fff}
+    .btn{background:var(--primary);color:#fff;border:0;border-radius:10px;padding:.6rem 1rem;font-size:.95rem;font-weight:700;cursor:pointer}
+    .btn:hover{background:var(--primary-d)} .btn:disabled{opacity:.5;cursor:default}
+    .btn.ghost{background:var(--surface);color:var(--primary);border:1px solid var(--border)}
+    .go{display:block;width:100%;padding:.9rem;font-size:1.05rem}
+    .toggle{display:inline-flex;align-items:center;gap:.4rem;cursor:pointer;user-select:none}
+    .muted{color:var(--dim);font-size:.85rem}
+    .pages{display:flex;flex-direction:column;gap:1rem}
+    .page{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+    .page .ptitle{padding:.5rem .8rem;border-bottom:1px solid var(--border);font-size:.85rem;color:var(--dim);background:var(--surface2)}
+    .page .imgbox{padding:.6rem;max-height:70vh}
+    .page img{display:block;max-width:100%}
+    .status{margin-top:.8rem;font-size:.92rem;min-height:1.2em}
+    .status.err{color:var(--warn)} .status.ok{color:var(--ok)}
+    .hide{display:none}
+    .toolbar{position:sticky;bottom:0;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow);border-radius:var(--r);padding:1rem 1.1rem;margin-top:1.1rem}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>PDF·문서 자르기·회전·변환</h1>
+    <span class="sub">기울기 보정 · 회전 · 자르기 · A4/Letter/명함 맞춤 · PDF/PNG/JPG</span>
+    <a href="../" style="margin-left:auto">← 창고</a>
+  </header>
+
+  <div class="wrap">
+    <!-- 1. 업로드 + 보정 -->
+    <section class="panel">
+      <h2>1. 불러오기 · 보정</h2>
+      <label class="drop" id="drop">
+        <input type="file" id="file" accept=".pdf,.png,.jpg,.jpeg,.bmp,.tif,.tiff,.webp">
+        <div id="dropLabel"><strong>PDF·이미지를 끌어다 놓거나 클릭</strong></div>
+        <div class="muted">PDF · PNG · JPG · TIFF · 최대 50MB</div>
+      </label>
+      <div class="row">
+        <span class="toggle"><input type="checkbox" id="deskew" checked> <label for="deskew" style="cursor:pointer">자동 기울기 보정(deskew)</label></span>
+      </div>
+      <div class="row">
+        <label class="k">회전</label>
+        <span class="seg" id="orient">
+          <button data-o="0" class="sel">0°</button>
+          <button data-o="90">90°</button>
+          <button data-o="180">180°</button>
+          <button data-o="270">270°</button>
+        </span>
+      </div>
+      <div class="row">
+        <label class="k">미세 회전</label>
+        <input type="range" id="fine" min="-10" max="10" step="0.5" value="0" style="flex:1;max-width:24rem">
+        <span class="muted" id="fineVal">0.0°</span>
+      </div>
+      <div class="row">
+        <button class="btn" id="loadBtn" disabled>불러오기 · 보정 적용</button>
+        <span class="muted">보정 옵션을 바꾸면 이 버튼을 다시 눌러 재적용</span>
+      </div>
+    </section>
+
+    <!-- 2. 페이지 (crop) -->
+    <section class="panel hide" id="step2">
+      <h2>2. 자르기 — 페이지 위에서 드래그</h2>
+      <p class="muted">용지를 고르면 자르기 박스 비율이 그 용지로 고정됩니다. 그대로 두면 전체 페이지가 변환돼요.</p>
+      <div class="pages" id="pages"></div>
+    </section>
+
+    <!-- 3. 변환 -->
+    <section class="toolbar hide" id="step3">
+      <h2 style="margin:.1rem 0 .8rem;font-size:1.02rem">3. 변환 · 다운로드</h2>
+      <div class="row">
+        <label class="k">용지 규격</label>
+        <select id="paper">
+          <option value="">없음 (자른 그대로)</option>
+          <option value="a4">A4</option><option value="a3">A3</option><option value="a5">A5</option>
+          <option value="letter">Letter</option><option value="legal">Legal</option><option value="tabloid">Tabloid</option>
+          <option value="card">명함 (90×50)</option><option value="card_us">명함 US (89×51)</option>
+        </select>
+        <span class="seg" id="paperMode">
+          <button data-m="crop" class="sel">비율 맞춰 잘라냄</button>
+          <button data-m="fit">흰 여백에 맞춤</button>
+        </span>
+        <span class="toggle"><input type="checkbox" id="landscape"> <label for="landscape" style="cursor:pointer">가로</label></span>
+      </div>
+      <div class="row">
+        <label class="k">출력 형식</label>
+        <span class="seg" id="fmt">
+          <button data-f="pdf" class="sel">PDF</button>
+          <button data-f="png">PNG</button>
+          <button data-f="jpg">JPG</button>
+        </span>
+        <label class="k" style="min-width:auto">품질</label>
+        <input type="range" id="quality" min="40" max="100" value="92" style="width:10rem">
+        <span class="muted" id="qVal">92</span>
+      </div>
+      <button class="btn go" id="convertBtn">변환 · 다운로드</button>
+      <div class="status" id="status"></div>
+    </section>
+  </div>
+
+  <script src="static/cropper.min.js"></script>
+  <script>
+  const $=s=>document.querySelector(s);
+  const PAPERS={a3:[297,420],a4:[210,297],a5:[148,210],letter:[215.9,279.4],legal:[215.9,355.6],tabloid:[279.4,431.8],card:[90,50],card_us:[88.9,50.8]};
+  let selectedFile=null, token=null, pages=[], orientVal=0;
+
+  // 파일 선택 / 드래그
+  const drop=$('#drop'), fileInput=$('#file'), loadBtn=$('#loadBtn');
+  ['dragover','dragenter'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.add('over')}));
+  ['dragleave','drop'].forEach(e=>drop.addEventListener(e,ev=>{ev.preventDefault();drop.classList.remove('over')}));
+  drop.addEventListener('drop',e=>{ if(e.dataTransfer.files[0]) pickFile(e.dataTransfer.files[0]); });
+  fileInput.addEventListener('change',()=>{ if(fileInput.files[0]) pickFile(fileInput.files[0]); });
+  function pickFile(f){ selectedFile=f; $('#dropLabel').innerHTML='<span class="file-name">'+f.name+'</span> — 다시 고르려면 클릭'; loadBtn.disabled=false; }
+
+  // 보정 옵션
+  $('#orient').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$('#orient').children].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');orientVal=+b.dataset.o;});
+  $('#fine').addEventListener('input',e=>$('#fineVal').textContent=(+e.target.value).toFixed(1)+'°');
+
+  // 출력 옵션 토글
+  let paperMode='crop', fmt='pdf';
+  $('#paperMode').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$('#paperMode').children].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');paperMode=b.dataset.m;});
+  $('#fmt').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$('#fmt').children].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');fmt=b.dataset.f;});
+  $('#quality').addEventListener('input',e=>$('#qVal').textContent=e.target.value);
+  $('#paper').addEventListener('change',applyRatio);
+  $('#landscape').addEventListener('change',applyRatio);
+
+  function paperRatio(){
+    const p=$('#paper').value; if(!p||!PAPERS[p])return NaN;
+    let [w,h]=PAPERS[p]; if($('#landscape').checked)[w,h]=[h,w]; return w/h;
+  }
+  function applyRatio(){ const r=paperRatio(); pages.forEach(p=>p.cropper&&p.cropper.setAspectRatio(r)); }
+
+  // 업로드 · 보정
+  loadBtn.addEventListener('click',async()=>{
+    if(!selectedFile)return;
+    setStatus('불러오는 중…'); loadBtn.disabled=true;
+    const fd=new FormData();
+    fd.append('file',selectedFile);
+    fd.append('auto_deskew',$('#deskew').checked);
+    fd.append('rotate',$('#fine').value);
+    fd.append('orient',orientVal);
+    try{
+      const res=await fetch('api/upload',{method:'POST',body:fd});
+      if(!res.ok) throw new Error(await res.text());
+      const data=await res.json();
+      token=data.token; buildPages(data.pages);
+      $('#step2').classList.remove('hide'); $('#step3').classList.remove('hide');
+      setStatus('보정 완료 — '+data.pages.length+'페이지. 자르고 변환하세요.','ok');
+      $('#step2').scrollIntoView({behavior:'smooth'});
+    }catch(err){ setStatus('실패: '+err.message,'err'); }
+    loadBtn.disabled=false;
+  });
+
+  function buildPages(list){
+    pages.forEach(p=>p.cropper&&p.cropper.destroy());
+    pages=[]; const box=$('#pages'); box.innerHTML='';
+    const r=paperRatio();
+    list.forEach(pg=>{
+      const card=document.createElement('div'); card.className='page';
+      card.innerHTML='<div class="ptitle">페이지 '+(pg.idx+1)+' · '+pg.w+'×'+pg.h+'px</div><div class="imgbox"><img></div>';
+      const img=card.querySelector('img'); box.appendChild(card);
+      const rec={idx:pg.idx,cropper:null};
+      img.onload=()=>{ rec.cropper=new Cropper(img,{viewMode:1,autoCropArea:1,checkOrientation:false,background:false,aspectRatio:r}); };
+      img.src=pg.url+'?t='+Date.now();
+      pages.push(rec);
+    });
+  }
+
+  // 변환
+  $('#convertBtn').addEventListener('click',async()=>{
+    if(!token){setStatus('먼저 불러오기 하세요','err');return;}
+    setStatus('변환 중…'); $('#convertBtn').disabled=true;
+    const crops=pages.filter(p=>p.cropper).map(p=>{const d=p.cropper.getData(true);return{idx:p.idx,x:d.x,y:d.y,w:d.width,h:d.height};});
+    const fd=new FormData();
+    fd.append('token',token); fd.append('fmt',fmt);
+    fd.append('paper',$('#paper').value); fd.append('paper_mode',paperMode);
+    fd.append('landscape',$('#landscape').checked); fd.append('quality',$('#quality').value);
+    fd.append('crops',JSON.stringify(crops));
+    try{
+      const res=await fetch('api/convert',{method:'POST',body:fd});
+      if(!res.ok) throw new Error(await res.text());
+      const blob=await res.blob();
+      const cd=res.headers.get('Content-Disposition')||'';
+      const name=(cd.match(/filename="?([^"]+)"?/)||[])[1]||('webcrop.'+fmt);
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
+      setStatus('완료 — '+name+' 다운로드','ok');
+    }catch(err){ setStatus('실패: '+err.message,'err'); }
+    $('#convertBtn').disabled=false;
+  });
+
+  function setStatus(t,cls){ const s=$('#status'); s.textContent=t; s.className='status'+(cls?' '+cls:''); }
+  </script>
+</body>
+</html>
