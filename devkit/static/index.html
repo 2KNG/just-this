@@ -32,10 +32,12 @@
     .btn:hover{background:var(--primary-d)}
     .btn.sec{background:var(--surface);color:var(--primary);border:1px solid var(--border)}
     select,input[type=text],input[type=number]{background:var(--surface);color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:.45rem .6rem;font-size:.92rem}
+    input[type=color]{width:42px;height:32px;border:1px solid var(--border);border-radius:8px;padding:0;background:none;vertical-align:middle}
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
     label.k{color:var(--dim);font-size:.88rem}
     .muted{color:var(--dim);font-size:.84rem}
     .copy{margin-left:auto}
+    #sw{height:46px;border-radius:10px;border:1px solid var(--border);margin-top:.6rem}
     @media(max-width:640px){.grid2{grid-template-columns:1fr}}
   </style>
 </head>
@@ -58,78 +60,116 @@
       <button data-t="hash">해시</button>
       <button data-t="ts">타임스탬프</button>
       <button data-t="uuid">UUID</button>
+      <button data-t="pw">비밀번호</button>
+      <button data-t="color">색상</button>
+      <button data-t="regex">정규식</button>
+      <button data-t="text">텍스트</button>
     </div>
     <div class="panel" id="panel"></div>
   </div>
 
   <script>
   const $=s=>document.querySelector(s);
+  const NL=String.fromCharCode(10);
   fetch('/api/tools').then(r=>r.json()).then(d=>{const n=$('#nav');(d.tools||[]).forEach(t=>{if(!t._open)return;const a=document.createElement('a');a.href=t._open;a.textContent=t.short||t.name;if(t.slug==='devkit')a.className='cur';n.appendChild(a);});}).catch(()=>{});
 
-  // 공용 헬퍼
   const enc=new TextEncoder(), dec=new TextDecoder();
   function b64encode(str){const b=enc.encode(str);let s='';for(const x of b)s+=String.fromCharCode(x);return btoa(s);}
   function b64decode(b){const s=atob(b.replace(/-/g,'+').replace(/_/g,'/'));const a=new Uint8Array(s.length);for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i);return dec.decode(a);}
   function copyBtn(getText){const b=document.createElement('button');b.className='btn sec copy';b.textContent='복사';b.onclick=async()=>{try{await navigator.clipboard.writeText(getText());b.textContent='복사됨 ✓';setTimeout(()=>b.textContent='복사',1000);}catch(_){}};return b;}
   function out(el,text,err){el.textContent=text;el.className='out'+(err?' err':'');}
 
+  const P=()=>$('#panel');
   const TABS={
     json:()=>{
-      P.innerHTML=`<div class="ctl"><button class="btn" id="fmt">정리(들여쓰기)</button><button class="btn sec" id="min">압축</button><span class="muted">JSON 검증·포맷</span></div>
+      P().innerHTML=`<div class="ctl"><button class="btn" id="fmt">정리(들여쓰기)</button><button class="btn sec" id="min">압축</button><span class="muted">JSON 검증·포맷</span></div>
         <textarea id="in" placeholder='{"hello":"world","n":[1,2,3]}'></textarea><div class="out" id="o"></div>`;
       const run=(min)=>{try{const v=JSON.parse($('#in').value);out($('#o'),JSON.stringify(v,null,min?0:2));}catch(e){out($('#o'),'JSON 오류: '+e.message,1);}};
       $('#fmt').onclick=()=>run(false);$('#min').onclick=()=>run(true);
       $('#o').after(copyBtn(()=>$('#o').textContent));
     },
     base64:()=>{
-      P.innerHTML=`<div class="ctl"><button class="btn" id="e">인코드 →</button><button class="btn sec" id="d">← 디코드</button><span class="muted">UTF-8</span></div>
+      P().innerHTML=`<div class="ctl"><button class="btn" id="e">인코드 →</button><button class="btn sec" id="d">← 디코드</button><span class="muted">UTF-8</span></div>
         <textarea id="in" placeholder="텍스트 또는 base64"></textarea><div class="out" id="o"></div>`;
       $('#e').onclick=()=>{try{out($('#o'),b64encode($('#in').value));}catch(e){out($('#o'),e.message,1);}};
       $('#d').onclick=()=>{try{out($('#o'),b64decode($('#in').value.trim()));}catch(e){out($('#o'),'디코드 실패: '+e.message,1);}};
       $('#o').after(copyBtn(()=>$('#o').textContent));
     },
     url:()=>{
-      P.innerHTML=`<div class="ctl"><button class="btn" id="e">인코드 →</button><button class="btn sec" id="d">← 디코드</button></div>
+      P().innerHTML=`<div class="ctl"><button class="btn" id="e">인코드 →</button><button class="btn sec" id="d">← 디코드</button></div>
         <textarea id="in" placeholder="https://example.com/검색?q=한글 띄어쓰기"></textarea><div class="out" id="o"></div>`;
       $('#e').onclick=()=>out($('#o'),encodeURIComponent($('#in').value));
       $('#d').onclick=()=>{try{out($('#o'),decodeURIComponent($('#in').value));}catch(e){out($('#o'),e.message,1);}};
       $('#o').after(copyBtn(()=>$('#o').textContent));
     },
     jwt:()=>{
-      P.innerHTML=`<div class="ctl"><button class="btn" id="dec">디코드</button><span class="muted">서명 검증 X · 로컬 디코드만 (토큰을 남의 사이트에 붙여넣지 마세요)</span></div>
+      P().innerHTML=`<div class="ctl"><button class="btn" id="dec">디코드</button><span class="muted">서명 검증 X · 로컬 디코드만 (토큰을 남의 사이트에 붙여넣지 마세요)</span></div>
         <textarea id="in" placeholder="eyJhbGciOi...header.payload.signature"></textarea>
         <div class="grid2"><div><label class="k">HEADER</label><div class="out" id="h"></div></div><div><label class="k">PAYLOAD</label><div class="out" id="p"></div></div></div>`;
       $('#dec').onclick=()=>{
         const t=$('#in').value.trim().split('.');
         if(t.length<2){out($('#h'),'JWT 형식 아님',1);out($('#p'),'',0);return;}
         try{out($('#h'),JSON.stringify(JSON.parse(b64decode(t[0])),null,2));}catch(e){out($('#h'),'header 오류: '+e.message,1);}
-        try{const pl=JSON.parse(b64decode(t[1]));let extra='';if(pl.exp)extra='\\n\\n// exp = '+new Date(pl.exp*1000).toLocaleString();if(pl.iat)extra+='\\n// iat = '+new Date(pl.iat*1000).toLocaleString();out($('#p'),JSON.stringify(pl,null,2)+extra);}catch(e){out($('#p'),'payload 오류: '+e.message,1);}
+        try{const pl=JSON.parse(b64decode(t[1]));let extra='';if(pl.exp)extra=NL+NL+'// exp = '+new Date(pl.exp*1000).toLocaleString();if(pl.iat)extra+=NL+'// iat = '+new Date(pl.iat*1000).toLocaleString();out($('#p'),JSON.stringify(pl,null,2)+extra);}catch(e){out($('#p'),'payload 오류: '+e.message,1);}
       };
     },
     hash:()=>{
-      P.innerHTML=`<div class="ctl"><select id="alg"><option>SHA-256</option><option>SHA-1</option><option>SHA-384</option><option>SHA-512</option></select><button class="btn" id="go">해시</button></div>
+      P().innerHTML=`<div class="ctl"><select id="alg"><option>SHA-256</option><option>SHA-1</option><option>SHA-384</option><option>SHA-512</option></select><button class="btn" id="go">해시</button></div>
         <textarea id="in" placeholder="해시할 텍스트"></textarea><div class="out" id="o"></div>`;
       $('#go').onclick=async()=>{try{const buf=await crypto.subtle.digest($('#alg').value,enc.encode($('#in').value));const hex=[...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');out($('#o'),hex);}catch(e){out($('#o'),e.message,1);}};
       $('#o').after(copyBtn(()=>$('#o').textContent));
     },
     ts:()=>{
-      P.innerHTML=`<div class="ctl"><button class="btn" id="now">지금</button><span class="muted">epoch(초/밀리초) ↔ 날짜</span></div>
+      P().innerHTML=`<div class="ctl"><button class="btn" id="now">지금</button><span class="muted">epoch(초/밀리초) ↔ 날짜</span></div>
         <div class="ctl"><label class="k">epoch</label><input type="text" id="ep" placeholder="1700000000" style="width:14rem"><button class="btn sec" id="fromEp">→ 날짜</button></div>
         <div class="ctl"><label class="k">날짜(ISO/로컬)</label><input type="text" id="dt" placeholder="2026-06-30 21:00" style="width:14rem"><button class="btn sec" id="fromDt">→ epoch</button></div>
         <div class="out" id="o"></div>`;
-      const show=(d)=>out($('#o'),'로컬: '+d.toString()+'\\nUTC : '+d.toUTCString()+'\\nISO : '+d.toISOString()+'\\nepoch(s) : '+Math.floor(d.getTime()/1000)+'\\nepoch(ms): '+d.getTime());
+      const show=(d)=>out($('#o'),'로컬: '+d.toString()+NL+'UTC : '+d.toUTCString()+NL+'ISO : '+d.toISOString()+NL+'epoch(s) : '+Math.floor(d.getTime()/1000)+NL+'epoch(ms): '+d.getTime());
       $('#now').onclick=()=>{const d=new Date();$('#ep').value=Math.floor(d.getTime()/1000);show(d);};
       $('#fromEp').onclick=()=>{let v=parseFloat($('#ep').value);if(!isFinite(v)){out($('#o'),'숫자를 넣어주세요',1);return;}if(v<1e12)v*=1000;show(new Date(v));};
       $('#fromDt').onclick=()=>{const d=new Date($('#dt').value);if(isNaN(d)){out($('#o'),'날짜 형식 오류',1);return;}show(d);};
     },
     uuid:()=>{
-      P.innerHTML=`<div class="ctl"><button class="btn" id="gen">UUID v4 생성</button><select id="cnt"><option>1</option><option>5</option><option>10</option></select></div><div class="out" id="o"></div>`;
-      $('#gen').onclick=()=>{const n=+$('#cnt').value;out($('#o'),Array.from({length:n},()=>crypto.randomUUID()).join('\\n'));};
+      P().innerHTML=`<div class="ctl"><button class="btn" id="gen">UUID v4 생성</button><select id="cnt"><option>1</option><option>5</option><option>10</option></select></div><div class="out" id="o"></div>`;
+      $('#gen').onclick=()=>{const n=+$('#cnt').value;out($('#o'),Array.from({length:n},()=>crypto.randomUUID()).join(NL));};
       $('#gen').click();
       $('#o').after(copyBtn(()=>$('#o').textContent));
     },
+    pw:()=>{
+      P().innerHTML=`<div class="ctl"><label class="k">길이</label><input type="number" id="len" min="4" max="128" value="20" style="width:5rem">
+        <label class="muted"><input type="checkbox" id="up" checked> A-Z</label> <label class="muted"><input type="checkbox" id="lo" checked> a-z</label>
+        <label class="muted"><input type="checkbox" id="nu" checked> 0-9</label> <label class="muted"><input type="checkbox" id="sy" checked> 기호</label>
+        <button class="btn" id="g">생성</button></div><div class="out" id="o"></div>`;
+      const gen=()=>{let set='';if($('#up').checked)set+='ABCDEFGHJKLMNPQRSTUVWXYZ';if($('#lo').checked)set+='abcdefghijkmnopqrstuvwxyz';if($('#nu').checked)set+='23456789';if($('#sy').checked)set+='!@#$%^&*()-_=+[]{}?';if(!set){out($('#o'),'문자 종류를 하나 이상 선택',1);return;}const n=Math.max(4,Math.min(128,+$('#len').value||20));const a=new Uint32Array(n);crypto.getRandomValues(a);out($('#o'),[...a].map(x=>set[x%set.length]).join(''));};
+      $('#g').onclick=gen;gen();$('#o').after(copyBtn(()=>$('#o').textContent));
+    },
+    color:()=>{
+      P().innerHTML=`<div class="ctl"><input type="text" id="in" placeholder="#3aa0dc 또는 rgb(58,160,220)" style="width:18rem"><input type="color" id="pick" value="#3aa0dc"><button class="btn" id="go">변환</button></div><div class="out" id="o"></div><div id="sw"></div>`;
+      const parse=s=>{s=s.trim();let m=s.match(/^#?([0-9a-fA-F]{6})$/);if(m)return[parseInt(m[1].slice(0,2),16),parseInt(m[1].slice(2,4),16),parseInt(m[1].slice(4,6),16)];m=s.match(/(\d{1,3})[ ,]+(\d{1,3})[ ,]+(\d{1,3})/);return m?[+m[1],+m[2],+m[3]]:null;};
+      const toHsl=(r,g,b)=>{r/=255;g/=255;b/=255;const mx=Math.max(r,g,b),mn=Math.min(r,g,b);let h=0,s=0,l=(mx+mn)/2;if(mx!==mn){const d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);h=mx===r?(g-b)/d+(g<b?6:0):mx===g?(b-r)/d+2:(r-g)/d+4;h/=6;}return[Math.round(h*360),Math.round(s*100),Math.round(l*100)];};
+      const show=()=>{const c=parse($('#in').value);if(!c){out($('#o'),'색 형식 오류 (#rrggbb 또는 rgb(r,g,b))',1);return;}const[r,g,b]=c.map(x=>Math.max(0,Math.min(255,x)));const hex='#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');const[H,S,L]=toHsl(r,g,b);out($('#o'),'HEX  '+hex+NL+'RGB  rgb('+r+', '+g+', '+b+')'+NL+'HSL  hsl('+H+', '+S+'%, '+L+'%)');$('#sw').style.background=hex;$('#pick').value=hex;};
+      $('#go').onclick=show;$('#pick').oninput=()=>{$('#in').value=$('#pick').value;show();};show();
+    },
+    regex:()=>{
+      P().innerHTML=`<div class="ctl"><input type="text" id="pat" placeholder="정규식 예: \\d+|[a-z]+" style="flex:1;min-width:12rem"><input type="text" id="flags" value="g" style="width:4.5rem"><button class="btn" id="go">테스트</button></div>
+        <textarea id="in" placeholder="대상 텍스트"></textarea><div class="out" id="o"></div>`;
+      $('#go').onclick=()=>{try{let fl=$('#flags').value;if(!fl.includes('g'))fl+='g';const re=new RegExp($('#pat').value,fl);const ms=[...$('#in').value.matchAll(re)];out($('#o'),ms.length?ms.length+'개 매치'+NL+ms.map((m,i)=>(i+1)+'. "'+m[0]+'"'+(m.length>1?'  ('+m.slice(1).join(', ')+')':'')).join(NL):'매치 없음');}catch(e){out($('#o'),'정규식 오류: '+e.message,1);}};
+    },
+    text:()=>{
+      P().innerHTML=`<div class="ctl"><button class="btn sec" data-op="sort">정렬</button><button class="btn sec" data-op="dedup">중복제거</button><button class="btn sec" data-op="reverse">줄뒤집기</button><button class="btn sec" data-op="trim">공백정리</button><button class="btn sec" data-op="upper">UPPER</button><button class="btn sec" data-op="lower">lower</button><button class="btn" data-op="count">개수</button></div>
+        <textarea id="in" placeholder="텍스트 (줄 단위 처리)"></textarea><div class="out" id="o"></div>`;
+      P().querySelectorAll('[data-op]').forEach(b=>b.onclick=()=>{const t=$('#in').value,L=t.split(NL),op=b.dataset.op;
+        if(op==='count'){out($('#o'),'줄 '+L.length+' · 단어 '+((t.match(/\S+/g)||[]).length)+' · 글자 '+t.length+' · 공백제외 '+t.replace(/\s/g,'').length);return;}
+        let r=t;
+        if(op==='sort')r=L.slice().sort().join(NL);
+        else if(op==='dedup')r=[...new Set(L)].join(NL);
+        else if(op==='reverse')r=L.slice().reverse().join(NL);
+        else if(op==='trim')r=L.map(x=>x.trim()).filter(Boolean).join(NL);
+        else if(op==='upper')r=t.toUpperCase();
+        else if(op==='lower')r=t.toLowerCase();
+        $('#in').value=r;out($('#o'),'적용: '+op);});
+    },
   };
-  const P=$('#panel');
   $('#tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$('#tabs').children].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');TABS[b.dataset.t]();});
   TABS.json();
   </script>

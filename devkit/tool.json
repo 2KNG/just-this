@@ -3,11 +3,20 @@
   "short": "개발",
   "slug": "devkit",
   "category": "개발",
-  "description": "JSON 정리·검증, Base64, URL 인코딩, JWT 디코드, 해시(SHA), 타임스탬프 변환, UUID 생성. 전부 브라우저에서 처리해 데이터가 서버로 안 나감(프라이버시).",
+  "description": "JSON 정리·검증, Base64, URL 인코딩, JWT 디코드, 해시(SHA), 타임스탬프, UUID, 비밀번호 생성, 색상 변환(HEX/RGB/HSL), 정규식 테스터, 텍스트 도구. 전부 브라우저에서 처리해 데이터가 서버로 안 나감(프라이버시).",
   "lang": "python",
   "type": "web",
   "run": "uvicorn app:app",
   "entry": "/devkit/",
-  "tags": ["json", "base64", "jwt", "hash", "uuid", "encode"],
+  "tags": [
+    "json",
+    "base64",
+    "jwt",
+    "hash",
+    "uuid",
+    "regex",
+    "color",
+    "password"
+  ],
   "replaces": "광고·추적 범벅 온라인 개발 유틸 사이트 (민감정보 붙여넣기 불필요)"
 }
