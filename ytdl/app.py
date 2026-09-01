@@ -299,6 +299,7 @@ def run_job(job, url, wanted, quality, numbering, tags):
             os.makedirs(itemdir, exist_ok=True)
             opts = {
                 "quiet": True, "no_warnings": True, "noplaylist": True,
+                "noprogress": True,          # 곡마다 진행줄이 콘솔에 쏟아지지 않게 (진행률은 훅으로)
                 "ffmpeg_location": FFDIR,
                 "outtmpl": os.path.join(itemdir, "track.%(ext)s"),
                 "format": "bestaudio/best",
