@@ -19,7 +19,7 @@
 | webcrop | 문서 | PDF·문서 회전(실시간)·자르기(테두리 스냅)·용지 실치수·변환 | pymupdf, opencv-headless, numpy |
 | pdftools | 문서 | PDF 합치기·페이지편집·압축·PDF↔이미지 | pymupdf, pillow |
 | vidconv | 미디어 | 동영상 구간/영역 자르기·리사이즈·MP4/WEBM/GIF/MP3/PNG | imageio-ffmpeg |
-| ytdl | 미디어 | 유튜브 영상/오디오·구간·자막 추출 | yt-dlp, imageio-ffmpeg |
+| ytdl | 미디어 | 유튜브 영상/오디오·구간·자막 추출, 재생목록 일괄 MP3(zip) | yt-dlp, imageio-ffmpeg |
 | devkit | 개발 | JSON·Base64·URL·JWT·해시·타임스탬프·UUID (전부 브라우저) | (없음) |
 | qr | 기타 | QR 생성·읽기 | qrcode, opencv-headless |
 
@@ -29,6 +29,9 @@
   `ffmpeg` 이름으로 심볼릭/복사해 `ffmpeg_location` 으로 넘김.
 - **ytdl 네트워크**: 실제 다운로드는 인터넷(유튜브 접속) 되는 환경에서만. 개발
   샌드박스는 프록시가 유튜브를 막아 라이브 다운로드는 미검증(옵션·에러처리는 검증).
+- **ytdl 재생목록**: `/api/playlist/*` — 목록 훑기(extract_flat) → 백그라운드 스레드 작업(job) →
+  진행률 폴링 → zip(1곡이면 mp3). 작업 상태는 프로세스 메모리(`JOBS`)에만 있어 멀티워커·재시작 시
+  유실. 곡별 실패는 건너뛰고 계속. yt-dlp 를 가짜로 바꿔 끼운 테스트로 zip·순번·중복이름·취소·전부실패 검증.
 - **webcrop 무손실/실치수**: 크롭은 브라우저(getCroppedCanvas)에서 보이는 그대로 →
   서버 조립. 용지 선택 시 PDF 페이지 = 그 용지 정확한 물리 치수(A4=210×297mm).
   용지 미선택이면 원본 스캔 치수(200DPI 기준) 보존.
