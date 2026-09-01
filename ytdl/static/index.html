@@ -308,6 +308,7 @@
       const res=await fetch('api/playlist/start',{method:'POST',body:fd});
       if(!res.ok)throw new Error((await res.json()).detail||res.status);
       job=await res.json(); pst('','');
+      try{localStorage.setItem('ytdl.pljob',job.id)}catch(_){}   // 폰에서 탭이 새로고침돼도 이어받기
       showJob(job); poll();
     }catch(err){pst('실패: '+err.message,'err');$('#pgoBtn').disabled=false;}
   });
@@ -330,10 +331,10 @@
     if(j.state==='done'){
       $('#pbar').style.width='100%'; $('#pcancel').disabled=true;
       $('#presult').classList.remove('hide'); $('#presult').textContent='결과 받기 — '+j.filename;
-      pjst('완료! '+(j.failed.length?j.failed.length+'곡은 실패했어요. ':'')+'아래 버튼으로 받으세요 (30분 후 자동 삭제)','ok');
+      pjst('완료! '+(j.failed.length?j.failed.length+'곡은 실패했어요. ':'')+'버튼을 눌러 받으세요 (30분 후 자동 삭제)','ok');
       $('#pgoBtn').disabled=false;
-    }else if(j.state==='error'){pjst('실패: '+j.error,'err');$('#pcancel').disabled=true;$('#pgoBtn').disabled=false;}
-    else if(j.state==='canceled'){pjst('취소됨','err');$('#pcancel').disabled=true;$('#pgoBtn').disabled=false;}
+    }else if(j.state==='error'){pjst('실패: '+j.error,'err');$('#pcancel').disabled=true;$('#pgoBtn').disabled=false;forgetJob();}
+    else if(j.state==='canceled'){pjst('취소됨','err');$('#pcancel').disabled=true;$('#pgoBtn').disabled=false;forgetJob();}
   }
   async function poll(){
     clearTimeout(pollTimer); if(!job)return;
@@ -342,19 +343,34 @@
       if(!res.ok)throw new Error((await res.json()).detail||res.status);
       job=await res.json(); renderJob(job);
       if(job.state==='running')pollTimer=setTimeout(poll,1500);
-    }catch(err){pjst('상태 확인 실패: '+err.message,'err');$('#pgoBtn').disabled=false;}
+    }catch(err){pjst('상태 확인 실패: '+err.message,'err');$('#pgoBtn').disabled=false;forgetJob();}
   }
+  function forgetJob(){try{localStorage.removeItem('ytdl.pljob')}catch(_){}}
+  // 페이지를 다시 열었을 때 진행 중이거나 아직 안 받은 작업이 있으면 패널 복원
+  (async()=>{
+    let id=null; try{id=localStorage.getItem('ytdl.pljob')}catch(_){}
+    if(!id)return;
+    try{
+      const res=await fetch('api/playlist/status/'+id); if(!res.ok)throw 0;
+      const j=await res.json(); if(j.state!=='running'&&!j.ready)throw 0;
+      job=j; $('#tabs button[data-t=playlist]').click(); showJob(j);
+      if(j.state==='running')poll(); else pjst('이전 작업 결과가 남아 있어요 — '+j.filename+' (30분 후 자동 삭제)','ok');
+    }catch(_){forgetJob();}
+  })();
   $('#pcancel').addEventListener('click',async()=>{
     if(!job)return; $('#pcancel').disabled=true; pjst('취소 중…','work');
     try{await fetch('api/playlist/cancel/'+job.id,{method:'POST'});}catch(_){}
   });
+  // 결과는 blob 으로 메모리에 올리지 않고 브라우저 다운로드 매니저에 바로 넘긴다
+  // (수백 MB zip 도 폰에서 안전, iOS 는 파일 앱·Android 는 다운로드 폴더로)
   $('#presult').addEventListener('click',async()=>{
-    if(!job)return; $('#presult').disabled=true; pjst('내려받는 중…','work');
+    if(!job)return; $('#presult').disabled=true;
     try{
-      const res=await fetch('api/playlist/result/'+job.id);
+      const res=await fetch('api/playlist/status/'+job.id);        // 만료 여부만 먼저 확인
       if(!res.ok)throw new Error((await res.json()).detail||res.status);
-      const r=await saveResponse(res,job.filename||'playlist.zip');
-      pjst('저장됨 — '+r.name+' ('+Math.round(r.size/1048576)+'MB)','ok');
+      const s=await res.json(); if(!s.ready)throw new Error('결과 파일이 없어요 (만료됐거나 실패)');
+      const a=document.createElement('a');a.href='api/playlist/result/'+job.id;a.download=job.filename||'playlist.zip';document.body.appendChild(a);a.click();a.remove();
+      pjst('다운로드 시작 — '+(job.filename||'')+' (브라우저 다운로드 목록 확인)','ok');
     }catch(err){pjst('실패: '+err.message,'err')}
     $('#presult').disabled=false;
   });
