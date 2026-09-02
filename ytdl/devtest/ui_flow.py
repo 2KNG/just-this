@@ -22,6 +22,26 @@ import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
+# 캔버스 무대(#pstage) 상태 — drawElement 지원이면 보여야(높이>100, 캔버스 자식 있음), 미지원이면 공간조차 없어야 한다
+STAGE_JS = """() => { const e = document.getElementById('pstage'); if (!e) return null;
+  const r = e.getBoundingClientRect(); return {hidden: e.hidden, h: r.height, disp: getComputedStyle(e).display,
+  kids: (e.querySelector('canvas') || {children: []}).children.length}; }"""
+# 600ms 동안 requestAnimationFrame 호출 수 — 작업이 끝난 뒤엔 0 이어야 한다(배터리)
+RAF_JS = """() => new Promise(res => { let c = 0; const o = window.requestAnimationFrame;
+  window.requestAnimationFrame = f => { c++; return o.call(window, f); };
+  setTimeout(() => { window.requestAnimationFrame = o; res(c); }, 600); })"""
+
+
+def stage_check(pg, sup, errs, when):
+    s = pg.evaluate(STAGE_JS)
+    if s is None:
+        print(f"스테이지({when}): #pstage 없음")
+        return
+    ok = (not s["hidden"] and s["h"] > 100 and s["kids"] > 0) if sup else (s["hidden"] and s["disp"] == "none" and s["h"] == 0)
+    print(f"스테이지({when}):", s, "OK" if ok else "!! 기대와 다름")
+    if not ok:
+        errs.append(f"stage[{when}]: {s}")
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -53,7 +73,8 @@ def main():
               if m.type == "error" and not (m.location or {}).get("url", "").endswith("/favicon.ico") else None)
 
         pg.goto(a.base)
-        print("drawElement 지원:", pg.evaluate("'drawElement' in CanvasRenderingContext2D.prototype"))
+        sup = pg.evaluate("'drawElement' in CanvasRenderingContext2D.prototype")
+        print("drawElement 지원:", sup)
         pg.click("#tabs button[data-t=playlist]")
         pg.fill("#purl", a.playlist)
         pg.click("#pinfoBtn")
@@ -66,9 +87,16 @@ def main():
 
         pg.click("#pgoBtn")
         pg.wait_for_selector("#pjob:not(.hide)", timeout=10000)
+        pg.wait_for_timeout(700)                                   # 카드 슬라이드 인이 끝난 뒤 찍기
+        stage_check(pg, sup, errs, "진행 중")
         pg.screenshot(path=os.path.join(a.shots, f"{tag}-2-running.png"), full_page=True)
         pg.wait_for_selector("#presult:not(.hide)", timeout=180000)
         print("완료:", pg.text_content("#pcount"), "|", pg.text_content("#pjstatus"))
+        stage_check(pg, sup, errs, "완료")
+        n = pg.evaluate(RAF_JS)
+        print("완료 후 600ms rAF 호출:", n)
+        if n:
+            errs.append(f"rAF still running after done: {n}")
         pg.screenshot(path=os.path.join(a.shots, f"{tag}-3-done.png"), full_page=True)
         print("가로 스크롤 없음:", pg.evaluate("document.documentElement.scrollWidth <= window.innerWidth"))
 
@@ -84,6 +112,8 @@ def main():
         pg.goto(a.base)
         pg.wait_for_selector("#presult:not(.hide)", timeout=15000)
         print("새로고침 후 결과 버튼 복원:", pg.get_attribute("#tabs button.sel", "data-t") == "playlist")
+        stage_check(pg, sup, errs, "새로고침 복원")
+        pg.screenshot(path=os.path.join(a.shots, f"{tag}-4-restored.png"), full_page=True)
         b.close()
 
     print("에러:", errs or "없음")
