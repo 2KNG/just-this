@@ -85,4 +85,4 @@ python ytdl/devtest/ui_flow.py --headed                       # 창 띄워서 �
 - 눈으로 보려면: `chrome --enable-blink-features=CanvasDrawElement` 로 크롬 띄우거나 `ui_flow.py --flag --headed`.
 
 ### 원격 세션 메모
-- 원격 세션이 PR #1 을 1시간마다 체크인 중(CI 없고 리뷰 없으면 아무것도 안 함). 로컬에서 같은 브랜치에 푸시해도 됨.
+- 원격 세션의 PR #1 자동 체크인·이벤트 구독은 **꺼둠**(로컬로 이관). 이 브랜치는 이제 로컬에서만 푸시함.
