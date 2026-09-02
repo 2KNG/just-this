@@ -46,3 +46,43 @@
 - 이미지 배경 제거(rembg, 모델 다운로드 필요), OCR(tesseract)
 - devkit 에 비밀번호 생성/정규식 테스터/색상 변환 탭 추가
 - webcrop 페이지별 개별 회전, 멀티워커 대응(세션 공유 스토리지)
+
+## 핸드오버 — 로컬 세션에서 이어서 (2026-09-02, 원격 세션 → 로컬)
+
+### 어디까지 됐나
+- 브랜치 `claude/youtube-playlist-mp3-joqcpi` → PR #1 (draft, main 대비 충돌 없음, CI 없음).
+  ytdl 에 **재생목록 → MP3** 탭: 목록 훑기 → 체크한 곡만 백그라운드 작업 → 320k mp3(제목·아티스트·앨범아트 태그) → zip.
+  폰 대응(직접 다운로드, 새로고침 후 이어받기)까지 포함. 상세는 PR 본문.
+- **검증된 것**: 실제 yt-dlp + 정적 ffmpeg 파이프라인(로컬 가짜 재생목록으로), 390px 모바일 UI 흐름(Playwright).
+- **미검증**: 유튜브 실접속 — 원격 샌드박스는 프록시가 `youtube.com` 을 막음(403). 로컬에서 실제 재생목록 하나로 한 번 돌려볼 것.
+  비공개 재생목록(로그인 필요)은 미지원. `music.youtube.com/playlist?list=…` 는 `youtube:tab` 추출기로 처리됨(오프라인 확인).
+
+### 로컬에서 돌려보기 (유튜브 없이도)
+```bash
+. venv/bin/activate
+pip install playwright && playwright install chromium        # 테스트용, requirements 엔 안 넣음
+python run.py                                                 # 터미널 1: 허브 http://localhost:8000
+python ytdl/devtest/make_fake_playlist.py --serve             # 터미널 2: 가짜 재생목록 http://127.0.0.1:8811/list.html
+python ytdl/devtest/ui_flow.py                                # 터미널 3: 폴백 경로(일반 브라우저) 전체 흐름
+python ytdl/devtest/ui_flow.py --flag --mobile                # drawElement 켜고 390px
+python ytdl/devtest/ui_flow.py --headed                       # 창 띄워서 눈으로
+```
+- `make_fake_playlist.py` = `<video poster>` 3개짜리 HTML → yt-dlp generic 추출기가 재생목록으로 인식. 한 곡 3초라 작업이 2초면 끝나 UI 반복에 좋다.
+- `ui_flow.py` = 붙여넣기→목록→선택→진행→결과 다운로드→새로고침 이어받기. 콘솔/페이지 에러 있으면 exit 1. 스크린샷은 `ytdl/devtest/_shots/`.
+
+### 다음 작업: HTML-in-Canvas 로 재생목록 진행 UI 꾸미기 (요청됨, 미착수)
+크롬 오리진 트라이얼 "HTML in Canvas" — HTML 요소를 캔버스에 그리는 `drawElement`. 원격 세션에서 **Chromium 141 로 실증한 사실**:
+- 켜기: `--enable-blink-features=CanvasDrawElement` (기본 크롬/사파리/폰 브라우저엔 **없음** — 오리진 트라이얼 토큰 없이는 안 보임).
+  감지: `'drawElement' in CanvasRenderingContext2D.prototype`.
+- 마크업 `<canvas layoutsubtree>…자식 요소…</canvas>`: 자식은 레이아웃은 되지만 DOM 이 그리진 않음. 지원 안 하는 브라우저에서도 캔버스 자식은 원래 안 보임 → **폴백은 기존 DOM UI 그대로**여야 함(캔버스 자식으로 폴백 X).
+- 그리기: `ctx.drawElement(el, x, y[, w, h])` — 현재 transform(회전·스케일) 적용됨. 그라데이션·한글·이모지 카드 회전 렌더 확인.
+- **제약**: drawElement 후 캔버스가 tainted → `toDataURL`/`getImageData` 불가(PNG 내보내기 용도 불가, 표시 전용).
+  이 빌드엔 `requestPaint` 류 없음 → rAF 로 직접 재그리기(작업 중일 때만, `document.hidden` 이면 멈춤). HiDPI 는 `devicePixelRatio` 로.
+- 설계 원칙: 점진적 향상. DOM(`#pjob` 진행바·현재곡·버튼)이 진실이고 캔버스는 장식. 미지원 시 변화·에러 0. 기존 셀렉터(`#pcount #pbar #pcur #presult …`) 유지.
+- 아이디어(원격 세션에서 설계 중이던 세 갈래): ① 플레이어 감성 — 회전 디스크 + 현재 곡 HTML 카드가 기울어져 들어오고 진행 링,
+  ② 정보 밀도 — 선택한 곡들을 HTML 칩으로 캔버스 타임라인에 배치해 대기→받는 중→완료/실패 애니메이션(50곡도 한눈에),
+  ③ 최소 — 현재 곡 카드 슬라이드 + 진행 아크만(120줄 이내). 폰에서 쓰는 도구라 ③→① 순으로 무난.
+- 눈으로 보려면: `chrome --enable-blink-features=CanvasDrawElement` 로 크롬 띄우거나 `ui_flow.py --flag --headed`.
+
+### 원격 세션 메모
+- 원격 세션이 PR #1 을 1시간마다 체크인 중(CI 없고 리뷰 없으면 아무것도 안 함). 로컬에서 같은 브랜치에 푸시해도 됨.
