@@ -73,7 +73,7 @@ def main():
               if m.type == "error" and not (m.location or {}).get("url", "").endswith("/favicon.ico") else None)
 
         pg.goto(a.base)
-        sup = pg.evaluate("'drawElement' in CanvasRenderingContext2D.prototype")
+        sup = pg.evaluate("['drawElementImage','drawElement'].some(n => n in CanvasRenderingContext2D.prototype)")   # 141 / 151+ 이름
         print("drawElement 지원:", sup)
         pg.click("#tabs button[data-t=playlist]")
         pg.fill("#purl", a.playlist)
