@@ -47,42 +47,49 @@
 - devkit 에 비밀번호 생성/정규식 테스터/색상 변환 탭 추가
 - webcrop 페이지별 개별 회전, 멀티워커 대응(세션 공유 스토리지)
 
-## 핸드오버 — 로컬 세션에서 이어서 (2026-09-02, 원격 세션 → 로컬)
+## 핸드오버 — 로컬에서 이어서 (2026-09-02, 원격 세션 → 로컬 teleport 완료)
 
 ### 어디까지 됐나
-- 브랜치 `claude/youtube-playlist-mp3-joqcpi` → PR #1 (draft, main 대비 충돌 없음, CI 없음).
-  ytdl 에 **재생목록 → MP3** 탭: 목록 훑기 → 체크한 곡만 백그라운드 작업 → 320k mp3(제목·아티스트·앨범아트 태그) → zip.
-  폰 대응(직접 다운로드, 새로고침 후 이어받기)까지 포함. 상세는 PR 본문.
-- **검증된 것**: 실제 yt-dlp + 정적 ffmpeg 파이프라인(로컬 가짜 재생목록으로), 390px 모바일 UI 흐름(Playwright).
-- **미검증**: 유튜브 실접속 — 원격 샌드박스는 프록시가 `youtube.com` 을 막음(403). 로컬에서 실제 재생목록 하나로 한 번 돌려볼 것.
-  비공개 재생목록(로그인 필요)은 미지원. `music.youtube.com/playlist?list=…` 는 `youtube:tab` 추출기로 처리됨(오프라인 확인).
+- PR #1 `claude/youtube-playlist-mp3-joqcpi`: **재생목록 → MP3** 탭(목록 훑기 → 체크한 곡만 백그라운드 작업 → 320k mp3 + 태그·앨범아트 → zip, 폰 대응).
+  **로컬에서 실제 유튜브로 검증 완료**(아래).
+- PR #2 `claude/youtube-playlist-mp3-handover-9w1w4k` (#1 위에 스택): **HTML-in-Canvas 진행 무대(`#pstage`)** 통합.
+  회전 디스크 + 현재 곡 HTML 카드(순번·현재 곡 %·제목·업로더/길이)가 기울어져 슬라이드 인/아웃 + 전체 진행 링.
+  done 은 초록 체크·zip 이름, error 는 주황 ✕, canceled 는 회색 ■, 실패 곡 카드는 주황 테두리.
+  DOM(`#pcount #pbar #pcur #pfails …`)이 진실이고 캔버스는 장식 — 미지원 브라우저에선 `#pstage` hidden → 변화·에러·레이아웃 공간 0.
+  코드는 `ytdl/static/index.html` 의 `PlStage` (CSS 16줄 + JS ~90줄), `renderJob()` 끝에서 `PlStage.update()` 한 줄.
 
-### 로컬에서 돌려보기 (유튜브 없이도)
-```bash
-. venv/bin/activate
-pip install playwright && playwright install chromium        # 테스트용, requirements 엔 안 넣음
-python run.py                                                 # 터미널 1: 허브 http://localhost:8000
-python ytdl/devtest/make_fake_playlist.py --serve             # 터미널 2: 가짜 재생목록 http://127.0.0.1:8811/list.html
-python ytdl/devtest/ui_flow.py                                # 터미널 3: 폴백 경로(일반 브라우저) 전체 흐름
-python ytdl/devtest/ui_flow.py --flag --mobile                # drawElement 켜고 390px
-python ytdl/devtest/ui_flow.py --headed                       # 창 띄워서 눈으로
+### 실제 유튜브 검증 (로컬, 2026-09-02)
+- `/api/playlist/info`: `youtube.com/playlist?list=`, `music.youtube.com/playlist?list=…&si=`, `watch?v=…&list=` 세 형태 모두 `youtube:tab` 추출기로 14곡 목록 ~3초.
+- `start`(1곡 선택, 192k, 태그 on) → 9초 완료 → mp3 에 제목·아티스트 태그 + 앨범아트(png attached pic) 확인, `result` 200.
+- 비공개 목록(로그인 필요)은 여전히 미지원.
+
+### HTML-in-Canvas — 실증 사실 (크롬 141 / 151 / 152)
+- 켜기: `--enable-blink-features=CanvasDrawElement`. 플래그 없으면 141·151·152 전부 API 없음(오리진 트라이얼 토큰 없인 안 보임).
+- **API 이름이 바뀜**: 141 `ctx.drawElement(el,x,y)` → 151+ `ctx.drawElementImage(el,x,y)`. 151+ 엔 `canvas.requestPaint()`, `paint` 이벤트(자식이 바뀌면 자동 발생),
+  `captureElementImage`, `getElementTransform` 도 생김. 코드는 두 이름을 다 받는다(`['drawElementImage','drawElement'].find(...)`).
+- 151+: 갓 만들거나 갓 바꾼 요소를 같은 프레임에 그리면 `InvalidStateError: No cached paint record` → try/catch 로 삼키고 다음 프레임에 그려짐
+  (끝 상태는 이중 rAF 로 한 장 더 그린다). 캔버스 **직계 자식만** 그릴 수 있음. 141 은 그리면 tainted, 151+ 는 안 됨(어차피 표시 전용).
+- transform(회전·스케일)·globalAlpha 적용됨. 캔버스 자식의 CSS transition/animation 은 프레임에 반영 안 됨 → 애니메이션은 JS 에서.
+- 캔버스 프리미티브는 CSS 변수를 못 읽어 같은 hex 를 하드코딩(#0f63ad #37a3df #1a9e5f #c2410c #d6e0ec #f4f7fb) — 팔레트 바꾸면 같이.
+
+### 눈으로 보기 / 테스트 (Windows 기준)
 ```
-- `make_fake_playlist.py` = `<video poster>` 3개짜리 HTML → yt-dlp generic 추출기가 재생목록으로 인식. 한 곡 3초라 작업이 2초면 끝나 UI 반복에 좋다.
-- `ui_flow.py` = 붙여넣기→목록→선택→진행→결과 다운로드→새로고침 이어받기. 콘솔/페이지 에러 있으면 exit 1. 스크린샷은 `ytdl/devtest/_shots/`.
+venv\Scripts\Activate.ps1                                                    # 가상환경 이름은 venv
+python run.py                                                                # 허브 http://localhost:8000 (8000 을 다른 앱이 쓰면 $env:PORT=8010)
+python ytdl/devtest/make_fake_playlist.py --serve [--port 8812]              # 가짜 재생목록 (유튜브 없이 2초 완주)
+python ytdl/devtest/ui_flow.py                                               # 폴백 경로(플래그 없음) 전체 흐름
+python ytdl/devtest/ui_flow.py --flag --mobile --chromium "C:\Program Files\Google\Chrome\Application\chrome.exe"
+    [--base http://localhost:8010/ytdl/ --playlist http://127.0.0.1:8812/list.html]   # 실제 크롬 152 로 390px
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --enable-blink-features=CanvasDrawElement http://localhost:8000/ytdl/   # 직접 보기
+```
+- `ui_flow.py` 는 무대도 검사한다: 지원이면 보임(높이>100, 캔버스 자식 2), 미지원이면 hidden·높이 0. 작업 완료 뒤 600ms 동안 rAF 호출 0. 새로고침 복원 경로도 같은 조건.
+- `stage_edge.py` = 리뷰에서 실측된 경계 사례 회귀 테스트(플래그 켠 크롬 전용): ① 새 작업 시작 시 이전 링 리셋 ② 폴링 실패 후 rAF 정지
+  ③ 다른 탭으로 가면 rAF 정지·돌아오면 재개 ④ 끝 상태에서 창 폭 바뀌면 다시 그림. 같은 `--base/--playlist/--chromium` 옵션.
+- 4모드(플래그 유무 × 데스크톱/모바일; Playwright Chromium 151 + 실제 크롬 152) 콘솔·페이지 에러 0 통과, `stage_edge.py` 두 브라우저 통과.
 
-### 다음 작업: HTML-in-Canvas 로 재생목록 진행 UI 꾸미기 (요청됨, 미착수)
-크롬 오리진 트라이얼 "HTML in Canvas" — HTML 요소를 캔버스에 그리는 `drawElement`. 원격 세션에서 **Chromium 141 로 실증한 사실**:
-- 켜기: `--enable-blink-features=CanvasDrawElement` (기본 크롬/사파리/폰 브라우저엔 **없음** — 오리진 트라이얼 토큰 없이는 안 보임).
-  감지: `'drawElement' in CanvasRenderingContext2D.prototype`.
-- 마크업 `<canvas layoutsubtree>…자식 요소…</canvas>`: 자식은 레이아웃은 되지만 DOM 이 그리진 않음. 지원 안 하는 브라우저에서도 캔버스 자식은 원래 안 보임 → **폴백은 기존 DOM UI 그대로**여야 함(캔버스 자식으로 폴백 X).
-- 그리기: `ctx.drawElement(el, x, y[, w, h])` — 현재 transform(회전·스케일) 적용됨. 그라데이션·한글·이모지 카드 회전 렌더 확인.
-- **제약**: drawElement 후 캔버스가 tainted → `toDataURL`/`getImageData` 불가(PNG 내보내기 용도 불가, 표시 전용).
-  이 빌드엔 `requestPaint` 류 없음 → rAF 로 직접 재그리기(작업 중일 때만, `document.hidden` 이면 멈춤). HiDPI 는 `devicePixelRatio` 로.
-- 설계 원칙: 점진적 향상. DOM(`#pjob` 진행바·현재곡·버튼)이 진실이고 캔버스는 장식. 미지원 시 변화·에러 0. 기존 셀렉터(`#pcount #pbar #pcur #presult …`) 유지.
-- 아이디어(원격 세션에서 설계 중이던 세 갈래): ① 플레이어 감성 — 회전 디스크 + 현재 곡 HTML 카드가 기울어져 들어오고 진행 링,
-  ② 정보 밀도 — 선택한 곡들을 HTML 칩으로 캔버스 타임라인에 배치해 대기→받는 중→완료/실패 애니메이션(50곡도 한눈에),
-  ③ 최소 — 현재 곡 카드 슬라이드 + 진행 아크만(120줄 이내). 폰에서 쓰는 도구라 ③→① 순으로 무난.
-- 눈으로 보려면: `chrome --enable-blink-features=CanvasDrawElement` 로 크롬 띄우거나 `ui_flow.py --flag --headed`.
+### 남은 것 / 아이디어
+- 플래그 없이 켜려면 오리진 트라이얼 토큰(`<meta http-equiv="origin-trial">`) — 개인 서버라 필요할 때 등록.
+- 다른 컨셉(정보 밀도 타임라인 — 선택한 곡을 칩으로 배치해 50곡 한눈에)은 미착수. 지금 무대는 "플레이어 감성" 한 갈래.
 
 ### 원격 세션 메모
-- 원격 세션의 PR #1 자동 체크인·이벤트 구독은 **꺼둠**(로컬로 이관). 이 브랜치는 이제 로컬에서만 푸시함.
+- 원격 세션 둘 다 PR 자동 체크인·이벤트 구독을 **꺼둠**. PR #1·#2 브랜치는 이제 로컬에서만 푸시함.
