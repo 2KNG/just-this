@@ -22,6 +22,7 @@ from urllib.parse import quote
 
 from fastapi import FastAPI, Form, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from starlette.concurrency import run_in_threadpool
 
 import yt_dlp
 from yt_dlp.utils import download_range_func
@@ -58,8 +59,18 @@ FFDIR = ffmpeg_dir()
 
 def cleanup():
     now = time.time()
+    with JOBS_LOCK:
+        # 돌고 있는 재생목록 작업 폴더는 mtime 이 오래돼도 지우면 안 된다
+        busy = {j.get("dir") for j in JOBS.values() if j["state"] == "running"}
+        # 끝난 작업은 TTL 이 지나면 목록에서도 뺀다 (JOBS 무한 증가 방지)
+        for jid, j in list(JOBS.items()):
+            t = j["ended"] if "ended" in j else j.get("created")
+            if j["state"] != "running" and t and now - t > TTL:
+                JOBS.pop(jid, None)
     for d in os.listdir(DL_ROOT):
         p = os.path.join(DL_ROOT, d)
+        if p in busy:
+            continue
         try:
             if os.path.isdir(p) and now - os.path.getmtime(p) > TTL:
                 shutil.rmtree(p, ignore_errors=True)
@@ -69,6 +80,12 @@ def cleanup():
 
 def valid_url(u):
     return bool(re.match(r"^https?://", (u or "").strip()))
+
+
+def content_disposition(fname):
+    # 헤더는 latin-1 만 허용 → filename= 엔 ASCII 대체, 실제 한글 이름은 filename*= 로
+    ascii_name = re.sub(r'[^\x20-\x7e]', "_", fname).replace('"', "")
+    return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(fname)}"
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -88,9 +105,12 @@ async def info(url: str = Form(...)):
         raise HTTPException(400, "http(s) URL 을 넣어주세요")
     opts = {"quiet": True, "no_warnings": True, "skip_download": True,
             "noplaylist": True, "ffmpeg_location": FFDIR}
-    try:
+    def _extract():
         with yt_dlp.YoutubeDL(opts) as ydl:
-            d = ydl.extract_info(url, download=False)
+            return ydl.extract_info(url, download=False)
+
+    try:
+        d = await run_in_threadpool(_extract)   # 이벤트 루프 막지 않게 스레드로
     except Exception as e:
         raise HTTPException(400, f"정보 가져오기 실패: {str(e)[:300]}")
     if d.get("entries"):
@@ -125,15 +145,14 @@ async def download(
 ):
     if not valid_url(url):
         raise HTTPException(400, "http(s) URL 을 넣어주세요")
-    cleanup()
-    dldir = os.path.join(DL_ROOT, str(int(time.time() * 1000)))
-    os.makedirs(dldir, exist_ok=True)
+    await run_in_threadpool(cleanup)
+    dldir = tempfile.mkdtemp(dir=DL_ROOT)   # 동시 요청에도 폴더가 겹치지 않게
 
     opts = {
         "quiet": True, "no_warnings": True, "noplaylist": True,
         "ffmpeg_location": FFDIR,
         "outtmpl": os.path.join(dldir, "%(title).80B.%(ext)s"),
-        "restrictfilenames": True,
+        # restrictfilenames 는 한글 제목을 '_' 로 뭉개서 뺌. 금지문자만 정리.
         "windowsfilenames": True,
     }
     if mode == "audio":
@@ -153,18 +172,22 @@ async def download(
         opts["download_ranges"] = download_range_func(None, [(float(start), float(end))])
         opts["force_keyframes_at_cuts"] = True
 
-    try:
+    def _dl():
         with yt_dlp.YoutubeDL(opts) as ydl:
             ydl.download([url])
+
+    try:
+        await run_in_threadpool(_dl)
     except Exception as e:
         shutil.rmtree(dldir, ignore_errors=True)
         raise HTTPException(400, f"다운로드 실패: {str(e)[:300]}")
 
     out = _pick_output(dldir)
     if not out:
+        shutil.rmtree(dldir, ignore_errors=True)
         raise HTTPException(400, "결과 파일을 찾지 못함")
     fname = os.path.basename(out)
-    disp = f"attachment; filename=\"{re.sub(chr(34), '', fname)}\"; filename*=UTF-8''{quote(fname)}"
+    disp = content_disposition(fname)
     media = "audio/mpeg" if out.endswith(".mp3") else \
         ("video/mp4" if out.endswith(".mp4") else "application/octet-stream")
     return FileResponse(out, media_type=media, headers={"Content-Disposition": disp})
@@ -216,7 +239,8 @@ def flat_entries(url, limit=MAX_ITEMS):
 
     raw = d.get("entries")
     if raw is None:                      # 재생목록이 아니라 영상 하나짜리 URL
-        raw = [d]
+        # d["url"] 은 포맷까지 고른 직접 미디어 주소일 수 있어 → 페이지 주소로 다시 받게
+        raw = [dict(d, url=d.get("webpage_url") or url)]
         title = ""
     else:
         title = d.get("title") or d.get("id") or ""
@@ -246,7 +270,7 @@ async def playlist_info(url: str = Form(...)):
     if not valid_url(url):
         raise HTTPException(400, "http(s) URL 을 넣어주세요")
     try:
-        title, items, truncated = flat_entries(url)
+        title, items, truncated = await run_in_threadpool(flat_entries, url)
     except Exception as e:
         raise HTTPException(400, f"재생목록 읽기 실패: {str(e)[:300]}")
     if not items:
@@ -264,7 +288,9 @@ def job_public(j):
         "id": j["id"], "state": j["state"], "total": j["total"],
         "done": j["done"], "current": j["current"], "pct": j["pct"],
         "failed": j["failed"], "error": j["error"],
-        "filename": j["filename"], "ready": bool(j["result"]),
+        "filename": j["filename"],
+        # TTL 로 파일이 정리됐으면 경로가 남아 있어도 준비 안 된 걸로
+        "ready": bool(j["result"]) and os.path.isfile(j["result"]),
     }
 
 
@@ -368,6 +394,7 @@ def run_job(job, url, wanted, quality, numbering, tags):
         shutil.rmtree(os.path.join(dldir, "items"), ignore_errors=True)
     finally:
         job["current"] = ""
+        job["ended"] = time.time()        # cleanup() 이 TTL 기준으로 JOBS 에서 뺄 때 씀
 
 
 def parse_indexes(s):
@@ -392,7 +419,7 @@ async def playlist_start(
         raise HTTPException(400, "http(s) URL 을 넣어주세요")
     if int(quality) not in (128, 192, 320):
         raise HTTPException(400, "음질은 128/192/320 중에서")
-    cleanup()
+    await run_in_threadpool(cleanup)
 
     with JOBS_LOCK:
         active = sum(1 for j in JOBS.values() if j["state"] == "running")
@@ -403,7 +430,8 @@ async def playlist_start(
         os.makedirs(dldir, exist_ok=True)
         job = {"id": jid, "dir": dldir, "state": "running", "total": 0, "done": 0,
                "current": "", "pct": 0, "failed": [], "error": "", "result": None,
-               "filename": "", "label": label, "cancel": False, "created": time.time()}
+               "filename": "", "label": label, "cancel": False, "created": time.time(),
+               "ended": None}
         JOBS[jid] = job
 
     t = threading.Thread(target=run_job, daemon=True, args=(
@@ -440,8 +468,6 @@ async def playlist_result(job_id: str):
     if not os.path.isfile(job["result"]):
         raise HTTPException(410, "결과 파일이 정리되었습니다 (30분 경과). 다시 받아주세요")
     fname = job["filename"]
-    # 헤더는 latin-1 만 허용 → filename= 엔 ASCII 대체, 실제 한글 이름은 filename*= 로
-    ascii_name = re.sub(r'[^\x20-\x7e]', "_", fname).replace('"', "")
-    disp = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(fname)}"
+    disp = content_disposition(fname)
     media = "application/zip" if fname.endswith(".zip") else "audio/mpeg"
     return FileResponse(job["result"], media_type=media, headers={"Content-Disposition": disp})

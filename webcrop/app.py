@@ -23,13 +23,15 @@ import uuid
 import zipfile
 
 import cv2
-import fitz  # PyMuPDF
 import numpy as np
+import pymupdf as fitz  # PyMuPDF (`import fitz` 는 사용 중단 경고)
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
-MAX_UPLOAD_MB = 50
+MAX_UPLOAD_MB = int(os.environ.get("JT_MAX_UPLOAD_MB", 50))   # 기존 기본값 유지 (화면 안내 50MB)
+MAX_PDF_PAGES = 200  # 200dpi A4 한 장 ≈ 11MB → 페이지 수도 막아야 RAM 이 안 터진다
 SESSION_TTL_SEC = 60 * 30
 RENDER_DPI = 200  # 미리보기=작업 해상도. Cropper 회전은 CSS 변환이라 이 해상도여도 부드럽다.
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -51,7 +53,13 @@ app.mount("/static", StaticFiles(directory=os.path.join(HERE, "static")), name="
 # ---------------- 이미지 처리 ----------------
 def pdf_or_image_to_images(data, ext, dpi):
     if ext == ".pdf":
-        doc = fitz.open(stream=data, filetype="pdf")
+        try:
+            doc = fitz.open(stream=data, filetype="pdf")
+        except Exception:
+            raise HTTPException(400, "PDF 를 열 수 없음 (손상/비PDF)")
+        if doc.page_count > MAX_PDF_PAGES:
+            doc.close()
+            raise HTTPException(413, f"페이지가 너무 많음 (최대 {MAX_PDF_PAGES}쪽)")
         out = []
         mat = fitz.Matrix(dpi / 72.0, dpi / 72.0)
         for page in doc:
@@ -159,8 +167,9 @@ def fit_paper_canvas(img, paper, landscape):
 def cleanup_sessions():
     now = time.time()
     for token in list(SESSIONS.keys()):
-        if now - SESSIONS[token]["ts"] > SESSION_TTL_SEC:
-            shutil.rmtree(SESSIONS[token]["dir"], ignore_errors=True)
+        s = SESSIONS.get(token)   # 스레드풀 작업과 동시에 돌 수 있어 KeyError 방지
+        if s and now - s["ts"] > SESSION_TTL_SEC:
+            shutil.rmtree(s["dir"], ignore_errors=True)
             SESSIONS.pop(token, None)
 
 
@@ -176,17 +185,14 @@ def healthz():
     return {"ok": True}
 
 
-@app.post("/api/upload")
-async def upload(file: UploadFile = File(...), auto_deskew: bool = Form(False)):
-    cleanup_sessions()
-    data = await file.read()
-    if len(data) > MAX_UPLOAD_MB * 1024 * 1024:
+def _check_size(f: UploadFile):
+    """메모리에 올리기 전에 크기부터 거른다 (size 를 모르면 읽은 뒤 다시 확인)."""
+    if f.size and f.size > MAX_UPLOAD_MB * 1024 * 1024:
         raise HTTPException(413, f"파일이 너무 큼 (최대 {MAX_UPLOAD_MB}MB)")
 
-    ext = os.path.splitext(file.filename or "")[1].lower()
-    if ext not in (".pdf", ".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp"):
-        raise HTTPException(400, f"지원하지 않는 포맷: {ext}")
 
+def _render_upload(data, ext, auto_deskew):
+    """렌더 + deskew + 미리보기 저장 (CPU 작업 → 스레드풀에서 호출)."""
     images = pdf_or_image_to_images(data, ext, RENDER_DPI)
     token = uuid.uuid4().hex
     sdir = os.path.join(TMP_ROOT, token)
@@ -197,7 +203,8 @@ async def upload(file: UploadFile = File(...), auto_deskew: bool = Form(False)):
         if auto_deskew:
             ang = detect_skew_angle(img)
             if abs(ang) > 0.05:
-                img = rotate_image(img, ang)
+                # np.where 가 (y, x) 순서라 각도 부호가 뒤집혀 나온다 → 반대로 돌려야 펴진다
+                img = rotate_image(img, -ang)
         fn = f"page_{i:03d}.png"
         cv2.imwrite(os.path.join(sdir, fn), img)
         h, w = img.shape[:2]
@@ -210,6 +217,21 @@ async def upload(file: UploadFile = File(...), auto_deskew: bool = Form(False)):
 
     SESSIONS[token] = {"dir": sdir, "files": files, "ts": time.time()}
     return {"token": token, "pages": pages}
+
+
+@app.post("/api/upload")
+async def upload(file: UploadFile = File(...), auto_deskew: bool = Form(False)):
+    _check_size(file)
+    await run_in_threadpool(cleanup_sessions)
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(413, f"파일이 너무 큼 (최대 {MAX_UPLOAD_MB}MB)")
+
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in (".pdf", ".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp"):
+        raise HTTPException(400, f"지원하지 않는 포맷: {ext}")
+
+    return await run_in_threadpool(_render_upload, data, ext, auto_deskew)
 
 
 @app.get("/api/preview/{token}/{idx}")
@@ -230,9 +252,19 @@ async def assemble(
     lossless: bool = Form(True),
     quality: int = Form(95),
 ):
-    pages = []
+    raws = []
     for f in files:
-        raw = np.frombuffer(await f.read(), np.uint8)
+        _check_size(f)
+        raws.append(await f.read())
+    return await run_in_threadpool(_assemble, raws, fmt, paper, paper_mode,
+                                   landscape, lossless, quality)
+
+
+def _assemble(raws, fmt, paper, paper_mode, landscape, lossless, quality):
+    """디코드·용지 맞춤·인코딩·PDF 조립 (CPU 작업 → 스레드풀에서 호출)."""
+    pages = []
+    for data in raws:
+        raw = np.frombuffer(data, np.uint8)
         img = cv2.imdecode(raw, cv2.IMREAD_COLOR)
         if img is None:
             continue

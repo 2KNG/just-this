@@ -11,34 +11,53 @@ import os
 import re
 import zipfile
 
-import fitz  # PyMuPDF
+import pymupdf as fitz  # PyMuPDF (`import fitz` 는 사용 중단 경고)
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, Response
+from starlette.concurrency import run_in_threadpool
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-MAX_MB = 100
+MAX_MB = int(os.environ.get("JT_MAX_UPLOAD_MB", 300))
 
 app = FastAPI(title="pdftools")
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 app.mount("/static", StaticFiles(directory=os.path.join(HERE, "static")), name="static")
 
 
-def _read(file: UploadFile) -> bytes:
-    return file.file.read()
+async def _read(file: UploadFile) -> bytes:
+    # 크기를 아는 경우 메모리에 올리기 전에 거르고, 모르면 읽은 뒤 확인
+    limit = MAX_MB * 1024 * 1024
+    if file.size and file.size > limit:
+        raise HTTPException(413, f"파일이 너무 큼 (최대 {MAX_MB}MB)")
+    data = await file.read()
+    if len(data) > limit:
+        raise HTTPException(413, f"파일이 너무 큼 (최대 {MAX_MB}MB)")
+    return data
 
 
 def _is_pdf(name, data):
     return (name or "").lower().endswith(".pdf") or data[:5] == b"%PDF-"
 
 
+def open_pdf(data):
+    """깨진/비PDF 는 FileDataError(500) 대신 400 으로."""
+    try:
+        return fitz.open(stream=data, filetype="pdf")
+    except Exception:
+        raise HTTPException(400, "PDF 를 열 수 없음 (손상/비PDF)")
+
+
 def open_as_pdf(name, data):
     """PDF면 그대로, 이미지면 1페이지 PDF로 변환해 fitz.Document 반환."""
     if _is_pdf(name, data):
-        return fitz.open(stream=data, filetype="pdf")
+        return open_pdf(data)
     # 이미지 → PDF
-    img = fitz.open(stream=data)  # fitz 가 이미지도 염
-    pdfbytes = img.convert_to_pdf()
-    img.close()
+    try:
+        img = fitz.open(stream=data)  # fitz 가 이미지도 염
+        pdfbytes = img.convert_to_pdf()
+        img.close()
+    except Exception:
+        raise HTTPException(400, f"열 수 없는 파일: {name}")
     return fitz.open(stream=pdfbytes, filetype="pdf")
 
 
@@ -91,98 +110,121 @@ async def merge(files: list[UploadFile] = File(...)):
     """여러 PDF/이미지를 순서대로 한 PDF로 합치기."""
     if len(files) < 1:
         raise HTTPException(400, "파일이 없음")
-    out = fitz.open()
-    for f in files:
-        data = _read(f)
-        if len(data) > MAX_MB * 1024 * 1024:
-            raise HTTPException(413, "파일이 너무 큼")
-        src = open_as_pdf(f.filename, data)
-        out.insert_pdf(src)
-        src.close()
-    if out.page_count == 0:
-        raise HTTPException(400, "합칠 페이지가 없음")
-    return pdf_response(out, "merged.pdf")
+    items = [(f.filename, await _read(f)) for f in files]
+
+    def _work():   # PyMuPDF 작업은 스레드풀에서 (이벤트 루프 막지 않게)
+        out = fitz.open()
+        for name, data in items:
+            src = open_as_pdf(name, data)
+            out.insert_pdf(src)
+            src.close()
+        if out.page_count == 0:
+            raise HTTPException(400, "합칠 페이지가 없음")
+        return pdf_response(out, "merged.pdf")
+
+    return await run_in_threadpool(_work)
 
 
 @app.post("/api/pages")
 async def pages(file: UploadFile = File(...), select: str = Form(""), rotate: int = Form(0)):
     """페이지 추출/삭제(select 범위만 남김) + 회전."""
-    data = _read(file)
-    doc = fitz.open(stream=data, filetype="pdf")
-    keep = parse_ranges(select, doc.page_count)
-    if not keep:
-        raise HTTPException(400, "남길 페이지가 없음")
-    doc.select(keep)
     r = int(rotate) % 360
-    if r:
-        for p in doc:
-            p.set_rotation((p.rotation + r) % 360)
-    return pdf_response(doc, "pages.pdf")
+    if r % 90:
+        raise HTTPException(400, "회전은 90도 단위")
+    data = await _read(file)
+
+    def _work():
+        doc = open_pdf(data)
+        keep = parse_ranges(select, doc.page_count)
+        if not keep:
+            raise HTTPException(400, "남길 페이지가 없음")
+        doc.select(keep)
+        if r:
+            for p in doc:
+                p.set_rotation((p.rotation + r) % 360)
+        return pdf_response(doc, "pages.pdf")
+
+    return await run_in_threadpool(_work)
 
 
 @app.post("/api/compress")
 async def compress(file: UploadFile = File(...), level: str = Form("light"), dpi: int = Form(120)):
     """light=무손실 정리 / strong=이미지 재렌더(JPEG)로 강하게."""
-    data = _read(file)
-    doc = fitz.open(stream=data, filetype="pdf")
-    if level == "strong":
-        out = fitz.open()
-        d = max(60, min(300, int(dpi)))
-        for page in doc:
-            pix = page.get_pixmap(matrix=fitz.Matrix(d / 72, d / 72), alpha=False)
-            jb = io.BytesIO()
-            from PIL import Image
-            Image.frombytes("RGB", (pix.width, pix.height), pix.samples).save(jb, "JPEG", quality=75)
-            r = page.rect
-            np_ = out.new_page(width=r.width, height=r.height)
-            np_.insert_image(np_.rect, stream=jb.getvalue())
-        doc.close()
-        return pdf_response(out, "compressed.pdf")
-    return pdf_response(doc, "compressed.pdf", garbage=4)
+    data = await _read(file)
+
+    def _work():
+        doc = open_pdf(data)
+        if level == "strong":
+            out = fitz.open()
+            d = max(60, min(300, int(dpi)))
+            for page in doc:
+                pix = page.get_pixmap(matrix=fitz.Matrix(d / 72, d / 72), alpha=False)
+                jb = io.BytesIO()
+                from PIL import Image
+                Image.frombytes("RGB", (pix.width, pix.height), pix.samples).save(jb, "JPEG", quality=75)
+                r = page.rect
+                np_ = out.new_page(width=r.width, height=r.height)
+                np_.insert_image(np_.rect, stream=jb.getvalue())
+            doc.close()
+            return pdf_response(out, "compressed.pdf")
+        return pdf_response(doc, "compressed.pdf", garbage=4)
+
+    return await run_in_threadpool(_work)
 
 
 @app.post("/api/to_images")
 async def to_images(file: UploadFile = File(...), fmt: str = Form("png"), dpi: int = Form(150)):
-    data = _read(file)
-    doc = fitz.open(stream=data, filetype="pdf")
+    data = await _read(file)
     d = max(36, min(600, int(dpi)))
     ext = "jpg" if fmt == "jpg" else "png"
     mt = "image/jpeg" if ext == "jpg" else "image/png"
-    from PIL import Image
-    imgs = []
-    for page in doc:
-        pix = page.get_pixmap(matrix=fitz.Matrix(d / 72, d / 72), alpha=False)
-        im = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
-        b = io.BytesIO()
-        if ext == "jpg":
-            im.save(b, "JPEG", quality=92)
-        else:
-            im.save(b, "PNG", optimize=True)
-        imgs.append(b.getvalue())
-    doc.close()
-    if not imgs:
-        raise HTTPException(400, "페이지가 없음")
-    if len(imgs) == 1:
-        return Response(imgs[0], media_type=mt,
-                        headers={"Content-Disposition": f'attachment; filename="page.{ext}"'})
-    zbuf = io.BytesIO()
-    with zipfile.ZipFile(zbuf, "w", zipfile.ZIP_DEFLATED) as z:
-        for i, b in enumerate(imgs, 1):
-            z.writestr(f"page_{i:03d}.{ext}", b)
-    return Response(zbuf.getvalue(), media_type="application/zip",
-                    headers={"Content-Disposition": 'attachment; filename="pages.zip"'})
+
+    def _work():
+        doc = open_pdf(data)
+        from PIL import Image
+        imgs = []
+        for page in doc:
+            pix = page.get_pixmap(matrix=fitz.Matrix(d / 72, d / 72), alpha=False)
+            im = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+            b = io.BytesIO()
+            if ext == "jpg":
+                im.save(b, "JPEG", quality=92)
+            else:
+                im.save(b, "PNG", optimize=True)
+            imgs.append(b.getvalue())
+        doc.close()
+        if not imgs:
+            raise HTTPException(400, "페이지가 없음")
+        if len(imgs) == 1:
+            return Response(imgs[0], media_type=mt,
+                            headers={"Content-Disposition": f'attachment; filename="page.{ext}"'})
+        zbuf = io.BytesIO()
+        with zipfile.ZipFile(zbuf, "w", zipfile.ZIP_DEFLATED) as z:
+            for i, b in enumerate(imgs, 1):
+                z.writestr(f"page_{i:03d}.{ext}", b)
+        return Response(zbuf.getvalue(), media_type="application/zip",
+                        headers={"Content-Disposition": 'attachment; filename="pages.zip"'})
+
+    return await run_in_threadpool(_work)
 
 
 @app.post("/api/from_images")
 async def from_images(files: list[UploadFile] = File(...)):
     """이미지 여러 장 → 1 PDF (각 이미지가 한 페이지)."""
-    out = fitz.open()
-    for f in files:
-        data = _read(f)
-        img = fitz.open(stream=data)
-        pdfbytes = img.convert_to_pdf()
-        img.close()
-        out.insert_pdf(fitz.open(stream=pdfbytes, filetype="pdf"))
-    if out.page_count == 0:
-        raise HTTPException(400, "이미지가 없음")
-    return pdf_response(out, "images.pdf")
+    items = [(f.filename, await _read(f)) for f in files]
+
+    def _work():
+        out = fitz.open()
+        for name, data in items:
+            try:
+                img = fitz.open(stream=data)
+                pdfbytes = img.convert_to_pdf()
+                img.close()
+            except Exception:
+                raise HTTPException(400, f"이미지를 열 수 없음: {name}")
+            out.insert_pdf(fitz.open(stream=pdfbytes, filetype="pdf"))
+        if out.page_count == 0:
+            raise HTTPException(400, "이미지가 없음")
+        return pdf_response(out, "images.pdf")
+
+    return await run_in_threadpool(_work)

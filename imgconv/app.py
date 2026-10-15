@@ -25,6 +25,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps
+from starlette.concurrency import run_in_threadpool
 
 # 아이폰 HEIC 지원
 try:
@@ -36,6 +37,8 @@ except Exception:  # libheif 미설치 등
     HEIF_OK = False
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+MAX_UPLOAD_MB = int(os.environ.get("JT_MAX_UPLOAD_MB", 300))
+MAX_OUT_PIXELS = 100_000_000  # 리사이즈 결과 상한 (percent=100000 같은 값으로 OOM 방지)
 
 app = FastAPI(title="imgconv")
 app.mount("/static", StaticFiles(directory=os.path.join(HERE, "static")), name="static")
@@ -91,6 +94,8 @@ def process_one(data: bytes, opt: dict, crop=None):
                 nw, nh = max(1, round(w * val / h)), val
         else:
             nw, nh = w, h
+        if nw * nh > MAX_OUT_PIXELS:
+            raise ValueError("결과 해상도가 너무 큼")
         if (nw, nh) != (w, h):
             im = im.resize((nw, nh), Image.LANCZOS)
 
@@ -175,10 +180,16 @@ async def convert(
     outputs = []  # (filename, bytes)
     skipped = []
     used_names = {}
+    limit = MAX_UPLOAD_MB * 1024 * 1024
     for f in files:
+        if f.size and f.size > limit:   # 메모리에 올리기 전에 거른다
+            raise HTTPException(413, f"파일이 너무 큼: {f.filename} (최대 {MAX_UPLOAD_MB}MB)")
         data = await f.read()
+        if len(data) > limit:
+            raise HTTPException(413, f"파일이 너무 큼: {f.filename} (최대 {MAX_UPLOAD_MB}MB)")
         try:
-            out, ext = process_one(data, opt, crop=crop)
+            # Pillow 처리는 CPU 작업 → 스레드풀 (허브 이벤트 루프 막지 않게)
+            out, ext = await run_in_threadpool(process_one, data, opt, crop)
         except Exception as e:  # 이미지가 아니거나 손상
             skipped.append(f"{f.filename}: {e}")
             continue
@@ -205,9 +216,12 @@ async def convert(
         return Response(out, media_type=mime, headers=headers)
 
     # 여러 장 → zip
-    zbuf = io.BytesIO()
-    with zipfile.ZipFile(zbuf, "w", zipfile.ZIP_DEFLATED) as z:
-        for name, out in outputs:
-            z.writestr(name, out)
+    def _zip():
+        zbuf = io.BytesIO()
+        with zipfile.ZipFile(zbuf, "w", zipfile.ZIP_DEFLATED) as z:
+            for name, out in outputs:
+                z.writestr(name, out)
+        return zbuf.getvalue()
+
     headers["Content-Disposition"] = content_disposition("imgconv.zip")
-    return Response(zbuf.getvalue(), media_type="application/zip", headers=headers)
+    return Response(await run_in_threadpool(_zip), media_type="application/zip", headers=headers)
