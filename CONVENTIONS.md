@@ -75,3 +75,23 @@ just-this/
 - 루트 `README.md`의 `<!-- TOOLS:START -->` ~ `<!-- TOOLS:END -->` 사이는 **손대지 말 것**. `index.py`가 덮어씀.
 - 도구별 의존성은 도구 폴더 안에서 격리 (각자 `requirements.txt`).
 - 비밀키·토큰은 절대 커밋 금지. 필요하면 `.env`(gitignore됨) + `.env.example`.
+
+## 웹 도구 UI — 공용 디자인 시스템
+허브가 `/static/ui.css` · `/static/ui.js` 를 서빙한다. 새 웹 도구는 `<head>` 의 인라인 `<style>` **뒤에** 두 줄만 넣으면
+라이트/다크 테마·상단 nav(현재 도구 표시)·⌘K 도구 이동·토스트·드롭존 보호가 자동으로 붙는다.
+
+```html
+  <link rel="stylesheet" href="/static/ui.css">
+  <script src="/static/ui.js"></script>
+</head>
+<body>
+  <nav class="nav"><a class="nav-brand" href="../">just-this</a><div class="nav-links" id="nav"></div></nav>
+  <div class="pagehead"><h1>도구 이름</h1><span class="sub">한 줄 설명</span></div>
+```
+- 색은 **토큰 변수만** 쓴다(`--bg --surface --surface2 --border --fg --dim --primary --accent --ok --warn`). hex 하드코딩하면 다크에서 깨짐.
+- 공용 클래스: `.panel` `.row` `.k` `.btn`(`.sec` `.ghost` `.sm`) `.seg` `.tabs` `.drop`(label + `input[type=file]`) `.status`(`.err` `.ok`) `.prog>i` `.note` `.out` `.muted`.
+- `.status` 에 텍스트만 넣으면 스피너 배지, `.err`/`.ok` 면 색 배지. 화면 밖이면 토스트로도 뜬다.
+- 서버 오류 메시지는 `errOf(res)` 헬퍼로(FastAPI `detail` 문자열·422 배열·비JSON 모두 처리).
+- 도구 아이콘은 `hub/static/ui.js` 의 `TOOL_ICON` 에 slug 한 줄 추가.
+- 단독 실행(`uvicorn app:app`)이면 `/static/ui.*` 가 없으니 인라인 스타일만으로도 쓸 만하게 유지할 것.
+

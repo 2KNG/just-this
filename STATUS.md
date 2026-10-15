@@ -38,13 +38,17 @@
 - **webcrop 무손실/실치수**: 크롭은 브라우저(getCroppedCanvas)에서 보이는 그대로 →
   서버 조립. 용지 선택 시 PDF 페이지 = 그 용지 정확한 물리 치수(A4=210×297mm).
   용지 미선택이면 원본 스캔 치수(200DPI 기준) 보존.
-- **프론트**: 모든 도구 밝은 파랑/흰색 톤 + 상단 네비게이션 바(다른 도구로 이동).
+- **프론트**: 공용 디자인 시스템 `hub/static/ui.css` + `ui.js` (2026-10 업그레이드).
+  라이트/다크(시스템 따라감 + 토글, localStorage `jt-theme`), 글래스 nav + 현재 도구 `aria-current`,
+  ⌘K/Ctrl+K 도구 이동 팔레트, 상태 배지(스피너/에러/완료) + 화면 밖이면 토스트, 드롭존 밖에 파일 떨궈도
+  브라우저가 파일을 열지 않게 보호(드롭존 1개면 거기로 전달). 허브는 카테고리 칩·`/` 검색·상태 점.
+  도구 인라인 CSS 의 변수명(--bg/--surface/...)을 ui.css 가 재정의하는 방식이라 도구 HTML 은 거의 그대로.
   Cropper.js 는 외부 CDN 대신 vendoring(`*/static/cropper.min.*`).
+  UI 스모크: `python hub/devtest/ui_smoke.py [스크린샷폴더]` (전 페이지 × 라이트/다크 × 데스크톱/모바일).
 
 ## 다음 후보 (미착수)
 - 웹페이지→PDF/스크린샷 (Playwright 설치돼 있음; 서버에서 async playwright 필요)
 - 이미지 배경 제거(rembg, 모델 다운로드 필요), OCR(tesseract)
-- devkit 에 비밀번호 생성/정규식 테스터/색상 변환 탭 추가
 - webcrop 페이지별 개별 회전, 멀티워커 대응(세션 공유 스토리지)
 
 ## 핸드오버 — 로컬에서 이어서 (2026-09-02, 원격 세션 → 로컬 teleport 완료)
@@ -70,7 +74,8 @@
 - 151+: 갓 만들거나 갓 바꾼 요소를 같은 프레임에 그리면 `InvalidStateError: No cached paint record` → try/catch 로 삼키고 다음 프레임에 그려짐
   (끝 상태는 이중 rAF 로 한 장 더 그린다). 캔버스 **직계 자식만** 그릴 수 있음. 141 은 그리면 tainted, 151+ 는 안 됨(어차피 표시 전용).
 - transform(회전·스케일)·globalAlpha 적용됨. 캔버스 자식의 CSS transition/animation 은 프레임에 반영 안 됨 → 애니메이션은 JS 에서.
-- 캔버스 프리미티브는 CSS 변수를 못 읽어 같은 hex 를 하드코딩(#0f63ad #37a3df #1a9e5f #c2410c #d6e0ec #f4f7fb) — 팔레트 바꾸면 같이.
+- 캔버스 프리미티브는 CSS 변수를 직접 못 읽어서, 그릴 때마다 `getComputedStyle` 로 현재 테마 토큰(--primary/--accent/--ok/--warn/--border/--surface2)을
+  읽는다(`PlStage` 의 `pal()`). 단독 실행이면 옛 hex 폴백. 디스크 몸체(비닐 남색)만 고정색.
 
 ### 눈으로 보기 / 테스트 (Windows 기준)
 ```
