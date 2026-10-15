@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
+  <meta name="color-scheme" content="light dark">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>이미지 변환·자르기 — just-this</title>
   <link rel="stylesheet" href="static/cropper.min.css">
@@ -20,7 +21,7 @@
     .pagehead h1{margin:0;font-size:1.4rem;color:var(--primary-d)}
     .pagehead .sub{color:var(--dim);font-size:.88rem}
     .wrap{max-width:60rem;margin:0 auto;padding:1.2rem 1rem 4rem}
-    .drop{border:2px dashed var(--border);border-radius:var(--r);padding:2rem 1rem;text-align:center;color:var(--dim);cursor:pointer;transition:.15s}
+    .drop{display:block;border:2px dashed var(--border);border-radius:var(--r);padding:2rem 1rem;text-align:center;color:var(--dim);cursor:pointer;transition:.15s}
     .drop:hover,.drop.over{border-color:var(--accent);color:var(--fg);background:var(--card)}
     .drop input{display:none}
     .stage{margin-top:1.2rem;display:none}
@@ -49,6 +50,8 @@
     .hide{display:none}
     .toggle{display:flex;align-items:center;gap:.4rem;cursor:pointer;user-select:none}
   </style>
+  <link rel="stylesheet" href="/static/ui.css">
+  <script src="/static/ui.js"></script>
 </head>
 <body>
   <nav class="nav">
@@ -135,7 +138,9 @@
   <script>
   const $ = s => document.querySelector(s);
   // 상단 네비: 허브의 도구 목록을 받아 채움 (단독 실행이면 조용히 생략)
-  fetch('/api/tools').then(r=>r.json()).then(d=>{const n=document.getElementById('nav');(d.tools||[]).forEach(t=>{if(!t._open)return;const a=document.createElement('a');a.href=t._open;a.textContent=t.short||t.name;if(t.slug==='imgconv')a.className='cur';n.appendChild(a);});}).catch(()=>{});
+  // 상단 nav 는 /static/ui.js 가 채운다 (현재 도구 표시·⌘K·테마 토글)
+  // 서버 오류 → 사람이 읽을 메시지 (FastAPI detail 문자열/422 배열/비JSON 응답 모두 처리)
+  async function errOf(r){const t=await r.text().catch(()=>'');try{const d=JSON.parse(t).detail;if(typeof d==='string')return d;if(Array.isArray(d))return d.map(x=>((x.loc||[]).slice(-1)[0]||'')+': '+(x.msg||'')).join(', ');}catch(_){}return (t&&t.length<200&&!/^\s*</.test(t))?t:('HTTP '+r.status+(r.statusText?' '+r.statusText:''));}
   let files = [], cropper = null;
 
   const fileInput=$('#file'), drop=$('#drop'), go=$('#go'), status=$('#status');
@@ -217,12 +222,12 @@
     fd.append('options',JSON.stringify(opt));
     try{
       const res=await fetch('api/convert',{method:'POST',body:fd});
-      if(!res.ok){ const t=await res.text(); throw new Error(t||('HTTP '+res.status)); }
+      if(!res.ok)throw new Error(await errOf(res));
       const blob=await res.blob();
       const cd=res.headers.get('Content-Disposition')||'';
       let name=(cd.match(/filename\*=UTF-8''([^;]+)/)||[])[1];
       name = name?decodeURIComponent(name):((cd.match(/filename="?([^"]+)"?/)||[])[1]||'output');
-      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click();
+      const a=document.createElement('a'); const u=URL.createObjectURL(blob);a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),60000);
       const skipped=res.headers.get('X-Skipped');
       status.className='status ok';
       status.textContent='완료 — '+name+(skipped?(' (일부 건너뜀: '+decodeURIComponent(skipped)+')'):'');

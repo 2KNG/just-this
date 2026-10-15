@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
+  <meta name="color-scheme" content="light dark">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>유튜브 추출 — just-this</title>
   <style>
@@ -81,6 +82,8 @@
     .ps-b{display:block;height:4px;margin-top:.4rem;background:var(--surface2);border-radius:99px;overflow:hidden}
     .ps-b>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--primary),var(--accent))}   /* transition 은 drawElement 프레임에 반영 안 됨(실측) → 없음 */
   </style>
+  <link rel="stylesheet" href="/static/ui.css">
+  <script src="/static/ui.js"></script>
 </head>
 <body>
   <nav class="nav">
@@ -203,7 +206,9 @@
 
   <script>
   const $=s=>document.querySelector(s);
-  fetch('/api/tools').then(r=>r.json()).then(d=>{const n=$('#nav');(d.tools||[]).forEach(t=>{if(!t._open)return;const a=document.createElement('a');a.href=t._open;a.textContent=t.short||t.name;if(t.slug==='ytdl')a.className='cur';n.appendChild(a);});}).catch(()=>{});
+  // 상단 nav 는 /static/ui.js 가 채운다 (현재 도구 표시·⌘K·테마 토글)
+  // 서버 오류 → 사람이 읽을 메시지 (FastAPI detail 문자열/422 배열/비JSON 응답 모두 처리)
+  async function errOf(r){const t=await r.text().catch(()=>'');try{const d=JSON.parse(t).detail;if(typeof d==='string')return d;if(Array.isArray(d))return d.map(x=>((x.loc||[]).slice(-1)[0]||'')+': '+(x.msg||'')).join(', ');}catch(_){}return (t&&t.length<200&&!/^\s*</.test(t))?t:('HTTP '+r.status+(r.statusText?' '+r.statusText:''));}
 
   function fmtDur(s){s=Math.round(s||0);const h=(s/3600|0),m=(s%3600/60|0),x=s%60;return (h?h+':':'')+String(m).padStart(h?2:1,'0')+':'+String(x).padStart(2,'0');}
   function setSt(id,t,c){const s=$(id);s.textContent=t;s.className='status'+(c?' '+c:'')}
@@ -212,7 +217,7 @@
     const cd=res.headers.get('Content-Disposition')||'';
     let name=(cd.match(/filename\*=UTF-8''([^;]+)/)||[])[1];
     name=name?decodeURIComponent(name):((cd.match(/filename="?([^"]+)"?/)||[])[1]||fallback);
-    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
+    const a=document.createElement('a');const u=URL.createObjectURL(blob);a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),60000);
     return {name,size:blob.size};
   }
 
@@ -247,7 +252,7 @@
     try{
       const fd=new FormData();fd.append('url',url);
       const res=await fetch('api/info',{method:'POST',body:fd});
-      if(!res.ok)throw new Error((await res.json()).detail||res.status);
+      if(!res.ok)throw new Error(await errOf(res));
       renderInfo(await res.json()); st0('정보 불러옴','ok');
     }catch(err){st0('실패: '+err.message,'err')}
     $('#infoBtn').disabled=false;
@@ -266,7 +271,7 @@
     if($('#useTrim').checked){fd.append('start',$('#start').value||0);fd.append('end',$('#end').value||0);}
     try{
       const res=await fetch('api/download',{method:'POST',body:fd});
-      if(!res.ok)throw new Error((await res.json()).detail||res.status);
+      if(!res.ok)throw new Error(await errOf(res));
       const r=await saveResponse(res,'download');
       st('완료 — '+r.name+' ('+Math.round(r.size/1048576)+'MB)','ok');
     }catch(err){st('실패: '+err.message,'err')}
@@ -282,6 +287,9 @@
     const fn=['drawElementImage','drawElement'].find(n=>n in CanvasRenderingContext2D.prototype), ok=!!fn, PI2=Math.PI*2, now=()=>performance.now();
     const CARD='<div class="ps-card"><div class="ps-h"><b class="ps-n"></b><span class="ps-pc"></span></div><div class="ps-t"></div><div class="ps-u"></div><i class="ps-b"><i></i></i></div>';
     let box,cv,ctx,cards,ci=0,W=0,H=0,CH=0,dpr=1,ang=0,raf=0,pt=0,t0=0,key,job=null,frac=0,sf=0,nf=0;
+    // 캔버스는 CSS 변수를 직접 못 읽는다 → 그릴 때마다 현재 테마(라이트/다크) 토큰을 읽어온다. 단독 실행이면 기존 hex 폴백
+    let P={}; const pal=()=>{const cs=getComputedStyle(document.documentElement),v=(n,d)=>cs.getPropertyValue(n).trim()||d;
+      P={pr:v('--primary','#0f63ad'),ac:v('--accent','#37a3df'),ok:v('--ok','#1a9e5f'),warn:v('--warn','#c2410c'),track:v('--border','#d6e0ec'),hole:v('--surface2','#f4f7fb')};};
     const G={};                                   // 지오메트리: cx,cy 디스크 중심 · R 디스크 · rr 진행 링 · x,cw 카드
     function fit(){                               // 컨테이너 폭·DPR·카드 높이에 맞춰 backing store 와 카드 폭 재계산 (변화 없으면 no-op). 숨겨져 폭 0 이면 false
       const w=box.clientWidth|0,d=devicePixelRatio||1,ch=Math.max(cards[0].offsetHeight,cards[1].offsetHeight); if(!w)return false; if(w===W&&d===dpr&&ch===CH)return true;
@@ -296,15 +304,15 @@
       ctx.fillStyle=g; ctx.beginPath(); ctx.arc(0,0,R,0,PI2); ctx.fill(); ctx.shadowColor='transparent';
       ctx.rotate(ang); ctx.fillStyle='rgba(255,255,255,.08)';                         // 회전하는 반사광 조각 3개
       for(let k=0;k<3;k++){ctx.rotate(PI2/3);ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,R,0,.55);ctx.fill();}
-      g=ctx.createLinearGradient(-R*.4,0,R*.4,0); g.addColorStop(0,'#37a3df'); g.addColorStop(1,'#0f63ad');   // 라벨(같이 회전)
+      g=ctx.createLinearGradient(-R*.4,0,R*.4,0); g.addColorStop(0,P.ac); g.addColorStop(1,P.pr);   // 라벨(같이 회전)
       ctx.fillStyle=g; ctx.beginPath(); ctx.arc(0,0,R*.38,0,PI2); ctx.fill();
       ctx.fillStyle='rgba(255,255,255,.5)'; ctx.beginPath(); ctx.arc(R*.22,0,2.5,0,PI2); ctx.fill();
       ctx.rotate(-ang); ctx.strokeStyle='rgba(255,255,255,.09)'; ctx.lineWidth=1;      // 홈 무늬(정적)
       for(let r=R*.45;r<R*.95;r+=4){ctx.beginPath();ctx.arc(0,0,r,0,PI2);ctx.stroke();}
       g=ctx.createLinearGradient(-R,-R,R*.5,R*.5); g.addColorStop(0,'rgba(255,255,255,.3)'); g.addColorStop(.55,'rgba(255,255,255,0)');   // 광택
       ctx.fillStyle=g; ctx.beginPath(); ctx.arc(0,0,R,0,PI2); ctx.fill();
-      if(run){ctx.fillStyle='#f4f7fb';ctx.beginPath();ctx.arc(0,0,R*.07,0,PI2);ctx.fill();}   // 가운데 구멍
-      else{ctx.fillStyle={done:'#1a9e5f',error:'#c2410c'}[st]||'#7f8fa6'; ctx.beginPath(); ctx.arc(0,0,R*.38,0,PI2); ctx.fill();   // 끝 상태 배지: ✓ / ✕ / ■
+      if(run){ctx.fillStyle=P.hole;ctx.beginPath();ctx.arc(0,0,R*.07,0,PI2);ctx.fill();}   // 가운데 구멍
+      else{ctx.fillStyle={done:P.ok,error:P.warn}[st]||'#7f8fa6'; ctx.beginPath(); ctx.arc(0,0,R*.38,0,PI2); ctx.fill();   // 끝 상태 배지: ✓ / ✕ / ■
         const s=R*.15; ctx.strokeStyle='#fff'; ctx.lineWidth=R*.075; ctx.lineCap=ctx.lineJoin='round'; ctx.beginPath();
         if(st==='done'){ctx.moveTo(-s,0);ctx.lineTo(-s*.3,s*.7);ctx.lineTo(s,-s*.65);}
         else if(st==='error'){ctx.moveTo(-s,-s);ctx.lineTo(s,s);ctx.moveTo(s,-s);ctx.lineTo(-s,s);}
@@ -312,9 +320,9 @@
       ctx.restore();
     }
     function ring(){                              // 전체 진행 링 (done+pct)/total
-      const {cx,cy,rr}=G; ctx.lineWidth=4; ctx.lineCap='round'; ctx.strokeStyle='#d6e0ec'; ctx.beginPath(); ctx.arc(cx,cy,rr,0,PI2); ctx.stroke();
-      if(sf>.001){const g=ctx.createLinearGradient(cx-rr,cy,cx+rr,cy); g.addColorStop(0,'#0f63ad'); g.addColorStop(1,'#37a3df');
-        ctx.strokeStyle=job.state==='done'?'#1a9e5f':g; ctx.beginPath(); ctx.arc(cx,cy,rr,-Math.PI/2,-Math.PI/2+sf*PI2); ctx.stroke();}
+      const {cx,cy,rr}=G; ctx.lineWidth=4; ctx.lineCap='round'; ctx.strokeStyle=P.track; ctx.beginPath(); ctx.arc(cx,cy,rr,0,PI2); ctx.stroke();
+      if(sf>.001){const g=ctx.createLinearGradient(cx-rr,cy,cx+rr,cy); g.addColorStop(0,P.pr); g.addColorStop(1,P.ac);
+        ctx.strokeStyle=job.state==='done'?P.ok:g; ctx.beginPath(); ctx.arc(cx,cy,rr,-Math.PI/2,-Math.PI/2+sf*PI2); ctx.stroke();}
     }
     function card(el,x,y,rot,a){                  // HTML 카드를 기울여서 그림 — 실패해도(151+ 는 갓 바꾼 요소에 "No cached paint record") DOM UI 는 무사, 다음 프레임에 그려짐
       const w=el.offsetWidth,h=el.offsetHeight; if(!w)return;
@@ -323,7 +331,7 @@
       ctx.restore();
     }
     function draw(t){
-      if(!job||!fit())return false; const run=job.state==='running';
+      if(!job||!fit())return false; pal(); const run=job.state==='running';
       if(run&&pt)ang=(ang+(t-pt)*.0022)%PI2; pt=t; sf=run?sf+(frac-sf)*.12:frac;   // 디스크 ≈2.9초/회전, 링은 lerp
       ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
       const p=run?Math.min(1,(t-t0)/600):1, e=1-Math.pow(1-p,3), cur=cards[ci], old=cards[ci^1];   // 끝 상태면 전환 생략(마지막 프레임 한 장)
@@ -403,7 +411,7 @@
     try{
       const fd=new FormData();fd.append('url',url);
       const res=await fetch('api/playlist/info',{method:'POST',body:fd});
-      if(!res.ok)throw new Error((await res.json()).detail||res.status);
+      if(!res.ok)throw new Error(await errOf(res));
       renderPlaylist(await res.json()); pst0('목록 불러옴','ok');
     }catch(err){pst0('실패: '+err.message,'err')}
     $('#pinfoBtn').disabled=false;
@@ -418,7 +426,7 @@
     if(sel.length!==plItems.length)fd.append('indexes',sel.join(','));
     try{
       const res=await fetch('api/playlist/start',{method:'POST',body:fd});
-      if(!res.ok)throw new Error((await res.json()).detail||res.status);
+      if(!res.ok)throw new Error(await errOf(res));
       job=await res.json(); pst('','');
       try{localStorage.setItem('ytdl.pljob',job.id)}catch(_){}   // 폰에서 탭이 새로고침돼도 이어받기
       showJob(job); poll();
@@ -453,7 +461,7 @@
     clearTimeout(pollTimer); if(!job)return;
     try{
       const res=await fetch('api/playlist/status/'+job.id);
-      if(!res.ok)throw new Error((await res.json()).detail||res.status);
+      if(!res.ok)throw new Error(await errOf(res));
       job=await res.json(); renderJob(job);
       if(job.state==='running')pollTimer=setTimeout(poll,1500);
     }catch(err){pjst('상태 확인 실패: '+err.message,'err');$('#pgoBtn').disabled=false;forgetJob();
@@ -481,7 +489,7 @@
     if(!job)return; $('#presult').disabled=true;
     try{
       const res=await fetch('api/playlist/status/'+job.id);        // 만료 여부만 먼저 확인
-      if(!res.ok)throw new Error((await res.json()).detail||res.status);
+      if(!res.ok)throw new Error(await errOf(res));
       const s=await res.json(); if(!s.ready)throw new Error('결과 파일이 없어요 (만료됐거나 실패)');
       const a=document.createElement('a');a.href='api/playlist/result/'+job.id;a.download=job.filename||'playlist.zip';document.body.appendChild(a);a.click();a.remove();
       pjst('다운로드 시작 — '+(job.filename||'')+' (브라우저 다운로드 목록 확인)','ok');

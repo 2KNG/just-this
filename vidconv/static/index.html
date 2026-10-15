@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
+  <meta name="color-scheme" content="light dark">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>동영상 자르기·변환 — just-this</title>
   <link rel="stylesheet" href="static/cropper.min.css">
@@ -25,7 +26,7 @@
     .panel h2{margin:.1rem 0 .9rem;font-size:1.02rem}
     .row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin:.55rem 0}
     .row>label.k{min-width:6rem;color:var(--dim);font-size:.9rem}
-    .drop{border:2px dashed var(--border);border-radius:var(--r);padding:1.6rem 1rem;text-align:center;color:var(--dim);cursor:pointer;background:var(--surface2)}
+    .drop{display:block;border:2px dashed var(--border);border-radius:var(--r);padding:1.6rem 1rem;text-align:center;color:var(--dim);cursor:pointer;background:var(--surface2)}
     .drop:hover,.drop.over{border-color:var(--primary);color:var(--fg)}
     .drop input{display:none}
     .file-name{color:var(--fg);font-weight:600}
@@ -49,6 +50,8 @@
     .status{margin-top:.8rem;font-size:.92rem;min-height:1.2em}
     .status.err{color:var(--warn)} .status.ok{color:var(--ok)}
   </style>
+  <link rel="stylesheet" href="/static/ui.css">
+  <script src="/static/ui.js"></script>
 </head>
 <body>
   <nav class="nav">
@@ -125,7 +128,9 @@
   <script src="static/cropper.min.js"></script>
   <script>
   const $=s=>document.querySelector(s);
-  fetch('/api/tools').then(r=>r.json()).then(d=>{const n=$('#nav');(d.tools||[]).forEach(t=>{if(!t._open)return;const a=document.createElement('a');a.href=t._open;a.textContent=t.short||t.name;if(t.slug==='vidconv')a.className='cur';n.appendChild(a);});}).catch(()=>{});
+  // 상단 nav 는 /static/ui.js 가 채운다 (현재 도구 표시·⌘K·테마 토글)
+  // 서버 오류 → 사람이 읽을 메시지 (FastAPI detail 문자열/422 배열/비JSON 응답 모두 처리)
+  async function errOf(r){const t=await r.text().catch(()=>'');try{const d=JSON.parse(t).detail;if(typeof d==='string')return d;if(Array.isArray(d))return d.map(x=>((x.loc||[]).slice(-1)[0]||'')+': '+(x.msg||'')).join(', ');}catch(_){}return (t&&t.length<200&&!/^\s*</.test(t))?t:('HTTP '+r.status+(r.statusText?' '+r.statusText:''));}
 
   let file=null, token=null, dur=0, vw=0, vh=0, cropper=null, fmt='mp4';
 
@@ -141,7 +146,7 @@
     const fd=new FormData(); fd.append('file',file);
     try{
       const res=await fetch('api/upload',{method:'POST',body:fd});
-      if(!res.ok)throw new Error(await res.text());
+      if(!res.ok)throw new Error(await errOf(res));
       const d=await res.json();
       token=d.token; dur=d.dur; vw=d.w; vh=d.h;
       $('#meta').textContent=`${vw}×${vh} · ${dur.toFixed(2)}초`;
@@ -185,11 +190,11 @@
     if($('#useCrop').checked && cropper){const d=cropper.getData(true);fd.append('crop',`${d.x},${d.y},${d.width},${d.height}`);}
     try{
       const res=await fetch('api/convert',{method:'POST',body:fd});
-      if(!res.ok)throw new Error(await res.text());
+      if(!res.ok)throw new Error(await errOf(res));
       const blob=await res.blob();
       const cd=res.headers.get('Content-Disposition')||'';
       const name=(cd.match(/filename="?([^"]+)"?/)||[])[1]||('vidconv.'+fmt);
-      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
+      const a=document.createElement('a');const u=URL.createObjectURL(blob);a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),60000);
       setStatus('완료 — '+name+' 다운로드 ('+Math.round(blob.size/1024)+'KB)','ok');
     }catch(err){setStatus('실패: '+err.message,'err')}
     $('#convertBtn').disabled=false;

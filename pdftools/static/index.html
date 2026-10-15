@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
+  <meta name="color-scheme" content="light dark">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PDF 합치기·편집·압축 — just-this</title>
   <style>
@@ -28,7 +29,7 @@
     .panel p.d{margin:.1rem 0 1rem;color:var(--dim);font-size:.9rem}
     .row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin:.6rem 0}
     .row>label.k{min-width:5rem;color:var(--dim);font-size:.9rem}
-    .drop{border:2px dashed var(--border);border-radius:var(--r);padding:1.4rem 1rem;text-align:center;color:var(--dim);cursor:pointer;background:var(--surface2)}
+    .drop{display:block;border:2px dashed var(--border);border-radius:var(--r);padding:1.4rem 1rem;text-align:center;color:var(--dim);cursor:pointer;background:var(--surface2)}
     .drop:hover,.drop.over{border-color:var(--primary);color:var(--fg)}
     .drop input{display:none}
     .files{margin:.6rem 0 0;font-size:.9rem;color:var(--fg)}
@@ -45,6 +46,8 @@
     .status{margin-top:.8rem;font-size:.92rem;min-height:1.2em}
     .status.err{color:var(--warn)} .status.ok{color:var(--ok)} .status.work{color:var(--primary)}
   </style>
+  <link rel="stylesheet" href="/static/ui.css">
+  <script src="/static/ui.js"></script>
 </head>
 <body>
   <nav class="nav">
@@ -103,7 +106,9 @@
 
   <script>
   const $=s=>document.querySelector(s);
-  fetch('/api/tools').then(r=>r.json()).then(d=>{const n=$('#nav');(d.tools||[]).forEach(t=>{if(!t._open)return;const a=document.createElement('a');a.href=t._open;a.textContent=t.short||t.name;if(t.slug==='pdftools')a.className='cur';n.appendChild(a);});}).catch(()=>{});
+  // 상단 nav 는 /static/ui.js 가 채운다 (현재 도구 표시·⌘K·테마 토글)
+  // 서버 오류 → 사람이 읽을 메시지 (FastAPI detail 문자열/422 배열/비JSON 응답 모두 처리)
+  async function errOf(r){const t=await r.text().catch(()=>'');try{const d=JSON.parse(t).detail;if(typeof d==='string')return d;if(Array.isArray(d))return d.map(x=>((x.loc||[]).slice(-1)[0]||'')+': '+(x.msg||'')).join(', ');}catch(_){}return (t&&t.length<200&&!/^\s*</.test(t))?t:('HTTP '+r.status+(r.statusText?' '+r.statusText:''));}
 
   const MODES={
     merge:{title:'PDF·이미지 합치기',desc:'여러 PDF·이미지를 고른 순서대로 한 PDF로 합칩니다.',multi:true,accept:'.pdf,image/*',ep:'merge',btn:'합치기'},
@@ -151,11 +156,11 @@
     if(mode==='to_images'){fd.append('fmt',tfmt);fd.append('dpi',$('#tdpi').value);}
     try{
       const res=await fetch('api/'+c.ep,{method:'POST',body:fd});
-      if(!res.ok)throw new Error((await res.json().catch(()=>({}))).detail||('HTTP '+res.status));
+      if(!res.ok)throw new Error(await errOf(res));
       const blob=await res.blob();
       const cd=res.headers.get('Content-Disposition')||'';
       const name=(cd.match(/filename="?([^"]+)"?/)||[])[1]||'output';
-      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
+      const a=document.createElement('a');const u=URL.createObjectURL(blob);a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),60000);
       st('완료 — '+name+' ('+Math.round(blob.size/1024)+'KB)','ok');
     }catch(err){st('실패: '+err.message,'err')}
     $('#go').disabled=false;

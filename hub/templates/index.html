@@ -2,9 +2,13 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
   <title>just-this — 도구 창고</title>
   <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/ui.css">
+  <link rel="stylesheet" href="/static/hub.css">
+  <script src="/static/ui.js"></script>
 </head>
 <body>
   <nav class="nav">
@@ -15,26 +19,46 @@
       {% endfor %}{% endfor %}
     </div>
     <div class="nav-right">
-      <a href="https://github.com/2KNG/just-this" target="_blank" rel="noopener">GitHub ↗</a>
+      <a href="https://github.com/2KNG/just-this" target="_blank" rel="noopener" class="jt-iconbtn" title="GitHub" aria-label="GitHub">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.77 2.71 1.26 3.37.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.69 5.38-5.26 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5z"/></svg>
+      </a>
     </div>
   </nav>
 
-  <div class="hero">
-    <p class="tagline">I JUST NEED THIS</p>
-  </div>
+  <header class="hero">
+    <span class="hero-eyebrow"><span class="pulse"></span>{{ mounted }}/{{ total }} 도구 실행 중 · 전부 로컬 처리</span>
+    <h1 class="tagline">I JUST NEED THIS</h1>
+    <p class="hero-sub">검색·광고·결제·업로드 없이, 딱 필요한 도구만 내 서버에서.</p>
+  </header>
 
   <div class="searchbar">
-    <input id="q" type="search" placeholder="도구 검색 — 이름 / 설명 / 태그…" autocomplete="off">
+    <div class="search-inner">
+      <svg class="search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="도구 검색 — 이름 / 설명 / 태그" autocomplete="off" aria-label="도구 검색">
+      <kbd class="search-kbd">/</kbd>
+    </div>
+    <div class="chips" id="chips" role="tablist" aria-label="카테고리">
+      <button type="button" class="chip sel" data-cat="">전체 <span class="num">{{ total }}</span></button>
+      {% for cat, items in groups %}
+      <button type="button" class="chip" data-cat="{{ cat }}">{{ cat }} <span class="num">{{ items|length }}</span></button>
+      {% endfor %}
+    </div>
   </div>
 
   {% macro card_body(t) %}
     <div class="card-head">
-      <h3 class="card-title">{{ t.name }}</h3>
-      {% if t.type %}<span class="badge type">{{ t.type }}</span>{% endif %}
+      <span class="card-ico" data-slug="{{ t.slug }}"></span>
+      <div class="card-titles">
+        <h3 class="card-title">{{ t.name }}</h3>
+        <span class="card-meta">
+          {% if t._mounted %}<span class="dot on"></span>실행 중{% elif t._needs_deps %}<span class="dot warn"></span>의존성 필요{% else %}<span class="dot"></span>준비중{% endif %}
+          <span class="sep">·</span>/{{ t.slug }}
+        </span>
+      </div>
     </div>
     <p class="desc">{{ t.description }}</p>
-    {% if t.tags %}<div class="tags">{% for tag in t.tags %}<span class="tag">{{ tag }}</span>{% endfor %}</div>{% endif %}
-    {% if t.replaces %}<p class="replaces"><span class="repl-label">대체</span> {{ t.replaces }}</p>{% endif %}
+    {% if t.tags %}<div class="tags">{% for tag in t.tags[:6] %}<span class="tag">{{ tag }}</span>{% endfor %}</div>{% endif %}
+    {% if t.replaces %}<p class="replaces"><span class="repl-label">대체</span>{{ t.replaces }}</p>{% endif %}
   {% endmacro %}
 
   <main id="catalog">
@@ -42,14 +66,14 @@
 
     {% for cat, items in groups %}
     <section class="category" data-cat="{{ cat }}">
-      <h2>{{ cat }} <span class="cat-count">{{ items|length }}</span></h2>
+      <h2>{{ cat }} <span class="cat-count num">{{ items|length }}</span></h2>
       <div class="grid">
         {% for t in items %}
-          {% set ds = (t.name ~ ' ' ~ t.description ~ ' ' ~ (t.tags|join(' ') if t.tags else '') ~ ' ' ~ t.slug)|lower %}
+          {% set ds = (t.name ~ ' ' ~ (t.short or '') ~ ' ' ~ t.description ~ ' ' ~ (t.tags|join(' ') if t.tags else '') ~ ' ' ~ t.slug)|lower %}
           {% if t._open %}
           <a class="card" href="{{ t._open }}"{% if t._open_blank %} target="_blank" rel="noopener"{% endif %} data-search="{{ ds }}">
             {{ card_body(t) }}
-            <span class="hint">열기 →</span>
+            <span class="hint">열기 <span class="arrow">→</span></span>
           </a>
           {% else %}
           <div class="card is-off" data-search="{{ ds }}">
@@ -63,26 +87,59 @@
     {% endfor %}
   </main>
 
-  <p id="noresult" class="empty" hidden>검색 결과 없음.</p>
+  <p id="noresult" class="empty" hidden>검색 결과 없음. <button type="button" class="linkbtn" id="clearq">검색 지우기</button></p>
+
+  <footer class="foot">
+    <span>just-this · 셀프호스팅 도구 창고</span>
+    <span class="foot-keys"><kbd>/</kbd> 검색 <kbd>⌘K</kbd> 도구 이동</span>
+  </footer>
 
   <script>
+    // 카드 아이콘 (ui.js 의 공용 아이콘 세트)
+    document.querySelectorAll('.card-ico').forEach(el => {
+      if (window.JT) el.outerHTML = JT.toolIcon(el.dataset.slug);
+    });
+
     const q = document.getElementById('q');
-    const cards = [...document.querySelectorAll('.card, .card.is-off')];
+    const cards = [...document.querySelectorAll('.card')];
     const cats = [...document.querySelectorAll('.category')];
+    const chips = [...document.querySelectorAll('.chip')];
     const noresult = document.getElementById('noresult');
+    let curCat = '';
+
     function applyFilter() {
       const term = q.value.trim().toLowerCase();
       let shown = 0;
-      for (const c of cards) {
-        const hit = !term || (c.dataset.search || '').includes(term);
-        c.hidden = !hit; if (hit) shown++;
-      }
       for (const sec of cats) {
-        sec.hidden = ![...sec.querySelectorAll('[data-search]')].some(c => !c.hidden);
+        const catOk = !curCat || sec.dataset.cat === curCat;
+        let any = false;
+        for (const c of sec.querySelectorAll('.card')) {
+          const hit = catOk && (!term || (c.dataset.search || '').includes(term));
+          c.hidden = !hit; if (hit) { shown++; any = true; }
+        }
+        sec.hidden = !any;
       }
       noresult.hidden = shown !== 0;
     }
     q.addEventListener('input', applyFilter);
+    document.getElementById('chips').addEventListener('click', e => {
+      const b = e.target.closest('.chip'); if (!b) return;
+      chips.forEach(x => { x.classList.toggle('sel', x === b); x.setAttribute('aria-selected', x === b); });
+      curCat = b.dataset.cat; applyFilter();
+    });
+    document.getElementById('clearq').addEventListener('click', () => {
+      q.value = ''; curCat = ''; chips.forEach((x, i) => x.classList.toggle('sel', i === 0)); applyFilter(); q.focus();
+    });
+    // '/' 로 검색창 포커스, Enter 로 첫 결과 열기, Esc 로 비우기
+    document.addEventListener('keydown', e => {
+      if (e.key === '/' && document.activeElement !== q && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) {
+        e.preventDefault(); q.focus(); q.select();
+      }
+    });
+    q.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { const first = cards.find(c => !c.hidden && c.href); if (first) location.href = first.href; }
+      if (e.key === 'Escape') { q.value = ''; applyFilter(); q.blur(); }
+    });
   </script>
 </body>
 </html>

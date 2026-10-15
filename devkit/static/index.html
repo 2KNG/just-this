@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
+  <meta name="color-scheme" content="light dark">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>개발 도구 모음 — just-this</title>
   <style>
@@ -40,6 +41,8 @@
     #sw{height:46px;border-radius:10px;border:1px solid var(--border);margin-top:.6rem}
     @media(max-width:640px){.grid2{grid-template-columns:1fr}}
   </style>
+  <link rel="stylesheet" href="/static/ui.css">
+  <script src="/static/ui.js"></script>
 </head>
 <body>
   <nav class="nav">
@@ -71,7 +74,7 @@
   <script>
   const $=s=>document.querySelector(s);
   const NL=String.fromCharCode(10);
-  fetch('/api/tools').then(r=>r.json()).then(d=>{const n=$('#nav');(d.tools||[]).forEach(t=>{if(!t._open)return;const a=document.createElement('a');a.href=t._open;a.textContent=t.short||t.name;if(t.slug==='devkit')a.className='cur';n.appendChild(a);});}).catch(()=>{});
+  // 상단 nav 는 /static/ui.js 가 채운다 (현재 도구 표시·⌘K·테마 토글)
 
   const enc=new TextEncoder(), dec=new TextDecoder();
   function b64encode(str){const b=enc.encode(str);let s='';for(const x of b)s+=String.fromCharCode(x);return btoa(s);}

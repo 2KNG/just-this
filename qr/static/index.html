@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
+  <meta name="color-scheme" content="light dark">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>QR 코드 생성·읽기 — just-this</title>
   <style>
@@ -32,7 +33,7 @@
     input[type=color]{width:42px;height:32px;border:1px solid var(--border);border-radius:8px;padding:0;background:none}
     .btn{background:var(--primary);color:#fff;border:0;border-radius:10px;padding:.65rem 1rem;font-size:1rem;font-weight:700;cursor:pointer}
     .btn:hover{background:var(--primary-d)} .btn.sec{background:var(--surface);color:var(--primary);border:1px solid var(--border)}
-    .drop{border:2px dashed var(--border);border-radius:var(--r);padding:1.4rem 1rem;text-align:center;color:var(--dim);cursor:pointer;background:var(--surface2)}
+    .drop{display:block;border:2px dashed var(--border);border-radius:var(--r);padding:1.4rem 1rem;text-align:center;color:var(--dim);cursor:pointer;background:var(--surface2)}
     .drop:hover,.drop.over{border-color:var(--primary);color:var(--fg)}
     .drop input{display:none}
     .qrbox{text-align:center;margin-top:1rem}
@@ -42,6 +43,8 @@
     .status{margin-top:.7rem;font-size:.9rem;min-height:1.1em}
     .status.err{color:var(--warn)} .status.ok{color:var(--ok)}
   </style>
+  <link rel="stylesheet" href="/static/ui.css">
+  <script src="/static/ui.js"></script>
 </head>
 <body>
   <nav class="nav">
@@ -81,7 +84,9 @@
 
   <script>
   const $=s=>document.querySelector(s);
-  fetch('/api/tools').then(r=>r.json()).then(d=>{const n=$('#nav');(d.tools||[]).forEach(t=>{if(!t._open)return;const a=document.createElement('a');a.href=t._open;a.textContent=t.short||t.name;if(t.slug==='qr')a.className='cur';n.appendChild(a);});}).catch(()=>{});
+  // 상단 nav 는 /static/ui.js 가 채운다 (현재 도구 표시·⌘K·테마 토글)
+  // 서버 오류 → 사람이 읽을 메시지 (FastAPI detail 문자열/422 배열/비JSON 응답 모두 처리)
+  async function errOf(r){const t=await r.text().catch(()=>'');try{const d=JSON.parse(t).detail;if(typeof d==='string')return d;if(Array.isArray(d))return d.map(x=>((x.loc||[]).slice(-1)[0]||'')+': '+(x.msg||'')).join(', ');}catch(_){}return (t&&t.length<200&&!/^\s*</.test(t))?t:('HTTP '+r.status+(r.statusText?' '+r.statusText:''));}
 
   $('#tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$('#tabs').children].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');
     $('#genP').style.display=b.dataset.t==='gen'?'block':'none';$('#readP').style.display=b.dataset.t==='read'?'block':'none';});
@@ -92,7 +97,7 @@
     const fd=new FormData();fd.append('text',text);fd.append('ecc',$('#ecc').value);fd.append('box',$('#box').value);fd.append('border',$('#border').value);fd.append('fg',$('#fg').value);fd.append('bg',$('#bg').value);
     try{
       const res=await fetch('api/generate',{method:'POST',body:fd});
-      if(!res.ok)throw new Error((await res.json().catch(()=>({}))).detail||res.status);
+      if(!res.ok)throw new Error(await errOf(res));
       const url=URL.createObjectURL(await res.blob());
       $('#qrbox').innerHTML=`<img src="${url}"><div style="margin-top:.6rem"><a class="btn" href="${url}" download="qr.png">PNG 다운로드</a></div>`;
       gs('생성 완료','ok');
@@ -109,7 +114,7 @@
     const fd=new FormData();fd.append('file',f);
     try{
       const res=await fetch('api/read',{method:'POST',body:fd});
-      if(!res.ok)throw new Error((await res.json().catch(()=>({}))).detail||res.status);
+      if(!res.ok)throw new Error(await errOf(res));
       const d=await res.json();
       $('#ro').textContent=d.results.join('\n'); $('#ro').style.display='block'; rs('읽음 — '+d.results.length+'개','ok');
     }catch(err){rs('실패: '+err.message,'err')}

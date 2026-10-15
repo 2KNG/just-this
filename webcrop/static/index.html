@@ -2,6 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
+  <meta name="color-scheme" content="light dark">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PDF·문서 자르기·회전·변환 — just-this</title>
   <link rel="stylesheet" href="static/cropper.min.css">
@@ -31,7 +32,7 @@
     .panel h2{margin:.1rem 0 .9rem;font-size:1.02rem}
     .row{display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;margin:.55rem 0}
     .row>label.k{min-width:6rem;color:var(--dim);font-size:.9rem}
-    .drop{border:2px dashed var(--border);border-radius:var(--r);padding:1.6rem 1rem;text-align:center;color:var(--dim);cursor:pointer;background:var(--surface2)}
+    .drop{display:block;border:2px dashed var(--border);border-radius:var(--r);padding:1.6rem 1rem;text-align:center;color:var(--dim);cursor:pointer;background:var(--surface2)}
     .drop:hover,.drop.over{border-color:var(--primary);color:var(--fg)}
     .drop input{display:none}
     .file-name{color:var(--fg);font-weight:600}
@@ -59,6 +60,8 @@
     .controls{position:sticky;top:58px;z-index:10;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow);border-radius:var(--r);padding:.9rem 1.1rem;margin-bottom:1.1rem}
     .toolbar{position:sticky;bottom:0;z-index:10;background:var(--surface);border:1px solid var(--border);box-shadow:0 -2px 16px rgba(20,50,90,.1);border-radius:var(--r);padding:1rem 1.1rem;margin-top:1.1rem}
   </style>
+  <link rel="stylesheet" href="/static/ui.css">
+  <script src="/static/ui.js"></script>
 </head>
 <body>
   <nav class="nav">
@@ -143,7 +146,9 @@
   <script src="static/cropper.min.js"></script>
   <script>
   const $=s=>document.querySelector(s);
-  fetch('/api/tools').then(r=>r.json()).then(d=>{const n=document.getElementById('nav');(d.tools||[]).forEach(t=>{if(!t._open)return;const a=document.createElement('a');a.href=t._open;a.textContent=t.short||t.name;if(t.slug==='webcrop')a.className='cur';n.appendChild(a);});}).catch(()=>{});
+  // 상단 nav 는 /static/ui.js 가 채운다 (현재 도구 표시·⌘K·테마 토글)
+  // 서버 오류 → 사람이 읽을 메시지 (FastAPI detail 문자열/422 배열/비JSON 응답 모두 처리)
+  async function errOf(r){const t=await r.text().catch(()=>'');try{const d=JSON.parse(t).detail;if(typeof d==='string')return d;if(Array.isArray(d))return d.map(x=>((x.loc||[]).slice(-1)[0]||'')+': '+(x.msg||'')).join(', ');}catch(_){}return (t&&t.length<200&&!/^\s*</.test(t))?t:('HTTP '+r.status+(r.statusText?' '+r.statusText:''));}
 
   let selectedFile=null, pages=[];   // pages: [{idx, cropper, snap:[x,y,w,h]}]
 
@@ -162,7 +167,7 @@
     const fd=new FormData();fd.append('file',selectedFile);fd.append('auto_deskew',$('#deskew').checked);
     try{
       const res=await fetch('api/upload',{method:'POST',body:fd});
-      if(!res.ok)throw new Error(await res.text());
+      if(!res.ok)throw new Error(await errOf(res));
       const data=await res.json();
       build(data.pages);
       $('#controls').classList.remove('hide');$('#pagesSec').classList.remove('hide');$('#toolbar').classList.remove('hide');
@@ -231,11 +236,11 @@
       const qv=$('#quality2').value,lossless=qv==='lossless';
       fd.append('lossless',lossless);fd.append('quality',lossless?100:qv);
       const res=await fetch('api/assemble',{method:'POST',body:fd});
-      if(!res.ok)throw new Error(await res.text());
+      if(!res.ok)throw new Error(await errOf(res));
       const blob=await res.blob();
       const cd=res.headers.get('Content-Disposition')||'';
       const name=(cd.match(/filename="?([^"]+)"?/)||[])[1]||('webcrop.'+fmt);
-      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
+      const a=document.createElement('a');const u=URL.createObjectURL(blob);a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),60000);
       status('완료 — '+name+' 다운로드','ok');
     }catch(err){status('실패: '+err.message,'err')}
     $('#convertBtn').disabled=false;
