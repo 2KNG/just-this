@@ -12,17 +12,23 @@ just-this 허브 — 레포의 모든 도구를 한 서버에 모아 띄우는 �
     # 또는: uvicorn hub.app:app --host 0.0.0.0 --port 8000
 """
 
+import hashlib
+import hmac
+import html
 import importlib
 import os
 import sys
+from urllib.parse import quote, urlsplit
 
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, Form, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)  # 레포 루트 (hub의 부모)
+PIN_FILE = os.path.join(ROOT, ".jt_pin")
+PIN_COOKIE = "jt_pin"
 
 # 도구 탐색 로직은 루트 index.py 와 단일 소스로 공유한다.
 sys.path.insert(0, ROOT)
@@ -31,6 +37,137 @@ import index  # noqa: E402  (load_tools, CATEGORY_ORDER 재사용)
 app = FastAPI(title="just-this 허브")
 app.mount("/static", StaticFiles(directory=os.path.join(HERE, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(HERE, "templates"))
+
+
+def get_pin() -> str:
+    """환경변수 JT_PIN 또는 루트 .jt_pin 파일에서 PIN을 읽는다. 비어 있으면 잠금 비활성화."""
+    env_pin = os.environ.get("JT_PIN", "").strip()
+    if env_pin:
+        return env_pin
+    if os.path.isfile(PIN_FILE):
+        try:
+            with open(PIN_FILE, encoding="utf-8") as f:
+                return f.read().strip()
+        except OSError:
+            return ""
+    return ""
+
+
+def _pin_token(pin: str) -> str:
+    return hmac.new(b"just-this-pin-v1", pin.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def _safe_next(raw: str | None) -> str:
+    if not raw:
+        return "/"
+    parts = urlsplit(raw)
+    if parts.scheme or parts.netloc or not raw.startswith("/") or raw.startswith("//"):
+        return "/"
+    return raw
+
+
+def _is_authenticated(request: Request, pin: str) -> bool:
+    header_pin = request.headers.get("x-jt-pin", "")
+    if header_pin and hmac.compare_digest(header_pin, pin):
+        return True
+    cookie_tok = request.cookies.get(PIN_COOKIE, "")
+    if cookie_tok and hmac.compare_digest(cookie_tok, _pin_token(pin)):
+        return True
+    return False
+
+
+def _render_pin_page(next_url: str = "/", error: str = "") -> HTMLResponse:
+    safe_next = html.escape(_safe_next(next_url), quote=True)
+    err_html = (
+        f'<div class="status err" style="margin-top:12px">{html.escape(error)}</div>'
+        if error
+        else ""
+    )
+    body = f"""<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PIN 잠금 — just-this</title>
+  <link rel="stylesheet" href="/static/ui.css">
+  <script>
+    (function(){{
+      var t = localStorage.getItem('jt-theme');
+      if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches))
+        document.documentElement.setAttribute('data-theme', 'dark');
+    }})();
+  </script>
+</head>
+<body style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;margin:0">
+  <div class="card" style="width:100%;max-width:360px;padding:28px 24px;text-align:center">
+    <div style="font-size:28px;margin-bottom:8px">🔒</div>
+    <h1 style="font-size:18px;margin:0 0 6px">PIN 잠금</h1>
+    <p class="sub" style="margin:0 0 18px;font-size:13px">계속하려면 서버 PIN을 입력하세요.</p>
+    <form method="post" action="/auth/pin" style="display:flex;flex-direction:column;gap:10px">
+      <input type="hidden" name="next" value="{safe_next}">
+      <input type="password" name="pin" inputmode="numeric" autocomplete="current-password"
+             placeholder="PIN 입력" autofocus required
+             style="text-align:center;font-size:18px;letter-spacing:0.18em;padding:10px 12px">
+      <button type="submit" class="btn primary" style="width:100%;justify-content:center;padding:10px">잠금 해제</button>
+    </form>
+    {err_html}
+  </div>
+</body>
+</html>"""
+    return HTMLResponse(body, status_code=401)
+
+
+@app.middleware("http")
+async def pin_gate_middleware(request: Request, call_next):
+    pin = get_pin()
+    if not pin:
+        return await call_next(request)
+    path = request.url.path
+    if path == "/healthz" or path.startswith("/static/") or path in ("/auth/pin", "/auth/logout"):
+        return await call_next(request)
+    if _is_authenticated(request, pin):
+        return await call_next(request)
+    accept = request.headers.get("accept", "")
+    is_api = path.startswith("/api/") or "/api/" in path or request.method not in ("GET", "HEAD")
+    if is_api or ("application/json" in accept and "text/html" not in accept):
+        return JSONResponse({"detail": "PIN 인증이 필요합니다."}, status_code=401)
+    next_url = path + (f"?{request.url.query}" if request.url.query else "")
+    return _render_pin_page(next_url=next_url)
+
+
+@app.get("/auth/pin", response_class=HTMLResponse)
+def auth_pin_page(next: str = "/"):
+    if not get_pin():
+        return RedirectResponse(_safe_next(next), status_code=303)
+    return _render_pin_page(next_url=next)
+
+
+@app.post("/auth/pin")
+def auth_pin_submit(pin: str = Form(""), next: str = Form("/")):
+    expected = get_pin()
+    target = _safe_next(next)
+    if not expected:
+        return RedirectResponse(target, status_code=303)
+    if not hmac.compare_digest(pin.strip(), expected):
+        return _render_pin_page(next_url=target, error="PIN이 올바르지 않습니다.")
+    resp = RedirectResponse(target, status_code=303)
+    resp.set_cookie(
+        PIN_COOKIE,
+        _pin_token(expected),
+        max_age=30 * 24 * 3600,
+        httponly=True,
+        samesite="lax",
+        path="/",
+    )
+    return resp
+
+
+@app.get("/auth/logout")
+@app.post("/auth/logout")
+def auth_logout():
+    resp = RedirectResponse("/", status_code=303)
+    resp.delete_cookie(PIN_COOKIE, path="/")
+    return resp
 
 MOUNTED = {}  # slug -> True : 서브앱으로 마운트 성공한 도구
 MOUNT_ERRORS = {}  # slug -> str : 마운트 실패 원인 (보통 의존성 미설치)

@@ -45,6 +45,9 @@
   도구 인라인 CSS 의 변수명(--bg/--surface/...)을 ui.css 가 재정의하는 방식이라 도구 HTML 은 거의 그대로.
   Cropper.js 는 외부 CDN 대신 vendoring(`*/static/cropper.min.*`).
   UI 스모크: `python hub/devtest/ui_smoke.py [스크린샷폴더]` (전 페이지 × 라이트/다크 × 데스크톱/모바일).
+- **PIN 잠금 (선택)**: `JT_PIN=1234 python run.py` 또는 루트 `.jt_pin` 파일에 PIN을 적어 두면
+  허브와 모든 마운트 도구가 PIN 잠금 화면(`/auth/pin`)으로 보호됨(30일 유지 `HttpOnly` 쿠키 `jt_pin` 또는 `X-JT-PIN` 헤더).
+  비워 두면 잠금 없이 바로 열림.
 
 ## 다음 후보 (미착수)
 - 웹페이지→PDF/스크린샷 (Playwright 설치돼 있음; 서버에서 async playwright 필요)

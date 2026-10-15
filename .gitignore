@@ -220,3 +220,6 @@ __marimo__/
 # ytdl 로컬 테스트 산출물
 ytdl/devtest/_fake/
 ytdl/devtest/_shots/
+
+# 로컬 PIN 설정 파일
+.jt_pin
